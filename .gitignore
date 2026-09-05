@@ -1,40 +1,38 @@
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+# ---------------------------------------------------------------- compilacion
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userprefs
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# ------------------------------------------------------------------ cobertura
+TestResults/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.coveragexml
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
-.vscode/
-
-# Local environment secrets
+# --------------------------------------------------------------------- secretos
+# NUNCA subir estos archivos: llevan la clave secreta de Stripe, la contrasena
+# del SMTP y la del Postgres. Si uno se sube por error no basta con borrarlo del
+# repositorio: hay que rotar todas las credenciales que contenia.
 .env
-.env.local
-.env.*.local
-.env.local-kafka
-.env.azure-eventhubs
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.Production.json
+secrets.json
+
+# ------------------------------------------------------------------- editores
+.vs/
+.vscode/
+.idea/
+*.swp
+
+# ------------------------------------------------------------------ sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Sems.Api</RootNamespace>
+    <!-- La documentacion XML alimenta a Swagger, que es requisito del enunciado -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Persistencia: EF Core sobre PostgreSQL -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.10" />
+
+    <!-- Autenticacion por JWT -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+
+    <!-- Documentacion OpenAPI / Swagger UI -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+
+    <!-- Pagos -->
+    <PackageReference Include="Stripe.net" Version="47.0.0" />
+
+    <!-- Hash de contrasenas -->
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+
+    <!-- Correo saliente -->
+    <PackageReference Include="MailKit" Version="4.17.0" />
+
+    <!-- Metricas para el monitoreo continuo -->
+    <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
+
+    <!-- Reintentos declarativos del envio de correo -->
+    <PackageReference Include="Polly" Version="8.4.2" />
+  </ItemGroup>
+
+</Project>
