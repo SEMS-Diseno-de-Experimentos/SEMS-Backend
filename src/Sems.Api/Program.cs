@@ -43,6 +43,16 @@ DotEnv.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ---------------------------------------------------------------------- puerto
+// Render (y casi cualquier proveedor) inyecta el puerto en PORT y espera que el
+// proceso escuche exactamente ahi. El ASPNETCORE_URLS del Dockerfile fija 8080,
+// que va bien en local pero deja al proveedor sin encontrar el servicio.
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(port))
+{
+    builder.WebHost.UseUrls($"http://+:{port}");
+}
+
 // ---------------------------------------------------------------------- JSON
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
