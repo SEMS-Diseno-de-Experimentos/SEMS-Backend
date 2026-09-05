@@ -315,17 +315,68 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     using var scope = app.Services.CreateScope();
     var services = scope.ServiceProvider;
 
+    // Deja en el log a que base se esta conectando, SIN la contrasena.
+    //
+    // Sirve para no depender de adivinar que hay en el panel del hosting: un
+    // error de conexion no dice si el problema es el host, la base o el
+    // usuario, y las variables no se pueden leer desde fuera. La contrasena
+    // nunca se registra; lo demas no es secreto (Supabase lo muestra en su
+    // propia pantalla de conexion).
+    try
+    {
+        var datos = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+        app.Logger.LogInformation(
+            "Conexion configurada -> Host={Host} Puerto={Port} Base={Database} Usuario={Username} Ssl={SslMode}",
+            datos.Host, datos.Port, datos.Database, datos.Username, datos.SslMode);
+
+        if (string.IsNullOrWhiteSpace(datos.Database))
+        {
+            app.Logger.LogError(
+                "Falta 'Database=postgres' en DATABASE_URL. Sin eso Npgsql no sabe a que base conectarse.");
+        }
+
+        // El pooler compartido de Supabase atiende a muchos proyectos en el
+        // mismo host y averigua cual es el tuyo por el sufijo del usuario
+        // (postgres.<ref-del-proyecto>). Sin el punto corta la conexion con
+        // "(ENOIDENTIFIER) no tenant identifier provided", que no se parece en
+        // nada a "te falta el sufijo del usuario".
+        if (datos.Host?.Contains("pooler.supabase.com", StringComparison.OrdinalIgnoreCase) == true
+            && datos.Username?.Contains('.') != true)
+        {
+            app.Logger.LogError(
+                "El usuario '{Username}' no lleva el sufijo del proyecto. Con el pooler de Supabase tiene que ser postgres.<ref-del-proyecto>.",
+                datos.Username);
+        }
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "DATABASE_URL no tiene un formato valido de Npgsql");
+    }
+
     try
     {
         var db = services.GetRequiredService<SemsDbContext>();
-        await db.Database.EnsureCreatedAsync();
-        app.Logger.LogInformation("Esquema de base de datos verificado");
+
+        // Migraciones, NO EnsureCreated().
+        //
+        // EnsureCreated() se rinde en silencio si la base de datos contiene
+        // cualquier tabla, y da por hecho que ya esta montada. En Supabase eso
+        // siempre se cumple: la base "postgres" viene de fabrica con los
+        // esquemas auth, storage y realtime. El resultado es que arranca sin
+        // quejarse, no crea ni una tabla, y luego cada peticion falla con
+        // 'relation "iam_users" does not exist'.
+        //
+        // Las migraciones llevan su propio registro en __EFMigrationsHistory,
+        // asi que no les importa lo que haya alrededor. Y ademas permiten
+        // cambiar el modelo mas adelante, cosa que EnsureCreated tampoco hace.
+        await db.Database.MigrateAsync();
+        app.Logger.LogInformation("Migraciones aplicadas: el esquema esta al dia");
     }
     catch (Exception ex)
     {
         // Se registra como error, no como aviso: sin esquema la aplicacion no
         // sirve para nada y el log tiene que dejarlo claro.
-        app.Logger.LogError(ex, "No se pudo crear o verificar el esquema de la base de datos");
+        app.Logger.LogError(ex, "No se pudieron aplicar las migraciones de la base de datos");
     }
 
     try
