@@ -1,0 +1,133 @@
+package com.sems.analytics.interfaces.rest;
+
+import com.sems.analytics.application.AnalyticsService;
+import com.sems.analytics.interfaces.rest.resources.AnalyticsResources.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * API REST del bounded context de analitica.
+ *
+ * <p>Rutas identicas a las del microservicio en FastAPI, bajo el prefijo
+ * {@code /api/v1/analytics}. El frontend consume sobre todo
+ * {@code /bill-predictions/user/{id}} y {@code /consumption-rankings/user/{id}}.
+ */
+@Tag(name = "Analytics", description = "Proyecciones, recomendaciones, anomalias y rankings")
+@RestController
+@RequestMapping("/api/v1/analytics")
+@RequiredArgsConstructor
+public class AnalyticsController {
+
+    private final AnalyticsService service;
+
+    // -------------------------------------------------------- bill-predictions
+
+    @Operation(summary = "Proyecciones de recibo de un usuario")
+    @GetMapping("/bill-predictions/user/{userId}")
+    public List<BillPredictionResponse> predictions(@PathVariable String userId) {
+        return service.predictionsByUser(userId).stream().map(BillPredictionResponse::from).toList();
+    }
+
+    @Operation(summary = "Registra una proyeccion de recibo")
+    @PostMapping("/bill-predictions")
+    public ResponseEntity<BillPredictionResponse> createPrediction(
+            @Valid @RequestBody CreatePredictionRequest r) {
+        var created = service.createPrediction(r.userId(), r.predictionYear(), r.predictionMonth(),
+                r.periodStart(), r.periodEnd(), r.estimatedKwh(), r.estimatedAmount(),
+                r.currency(), r.tariffUsed(), r.errorMarginPercentage());
+        return ResponseEntity.status(HttpStatus.CREATED).body(BillPredictionResponse.from(created));
+    }
+
+    // ---------------------------------------------------------- recommendations
+
+    @Operation(summary = "Recomendaciones de ahorro de un usuario")
+    @GetMapping("/recommendations/user/{userId}")
+    public List<RecommendationResponse> recommendations(@PathVariable String userId) {
+        return service.recommendationsByUser(userId).stream()
+                .map(RecommendationResponse::from).toList();
+    }
+
+    @Operation(summary = "Registra una recomendacion")
+    @PostMapping("/recommendations")
+    public ResponseEntity<RecommendationResponse> createRecommendation(
+            @Valid @RequestBody CreateRecommendationRequest r) {
+        var created = service.createRecommendation(r.userId(), r.deviceId(), r.recommendationType(),
+                r.title(), r.description(), r.estimatedSavingKwh(), r.estimatedSavingAmount(),
+                r.currency());
+        return ResponseEntity.status(HttpStatus.CREATED).body(RecommendationResponse.from(created));
+    }
+
+    @Operation(summary = "Marca una recomendacion como aplicada")
+    @PatchMapping("/recommendations/{recommendationId}/apply")
+    public RecommendationResponse applyRecommendation(@PathVariable UUID recommendationId) {
+        return RecommendationResponse.from(service.applyRecommendation(recommendationId));
+    }
+
+    // ---------------------------------------------------------------- anomalies
+
+    @Operation(summary = "Anomalias detectadas para un usuario")
+    @GetMapping("/anomalies/user/{userId}")
+    public List<AnomalyResponse> anomalies(@PathVariable String userId) {
+        return service.anomaliesByUser(userId).stream().map(AnomalyResponse::from).toList();
+    }
+
+    @Operation(summary = "Registra una anomalia")
+    @PostMapping("/anomalies")
+    public ResponseEntity<AnomalyResponse> createAnomaly(@Valid @RequestBody CreateAnomalyRequest r) {
+        var created = service.createAnomaly(r.userId(), r.deviceId(), r.anomalyType(),
+                r.description(), r.severity(), r.actualKwh(), r.expectedKwh());
+        return ResponseEntity.status(HttpStatus.CREATED).body(AnomalyResponse.from(created));
+    }
+
+    @Operation(summary = "Da por resuelta una anomalia")
+    @PatchMapping("/anomalies/{anomalyId}/resolve")
+    public AnomalyResponse resolveAnomaly(@PathVariable UUID anomalyId) {
+        return AnomalyResponse.from(service.resolveAnomaly(anomalyId));
+    }
+
+    // ------------------------------------------------------ device-identifications
+
+    @Operation(summary = "Identificaciones de aparatos de un usuario")
+    @GetMapping("/device-identifications/user/{userId}")
+    public List<DeviceIdentificationResponse> identifications(@PathVariable String userId) {
+        return service.identificationsByUser(userId).stream()
+                .map(DeviceIdentificationResponse::from).toList();
+    }
+
+    @Operation(summary = "Registra una identificacion de aparato")
+    @PostMapping("/device-identifications")
+    public ResponseEntity<DeviceIdentificationResponse> createIdentification(
+            @Valid @RequestBody CreateIdentificationRequest r) {
+        var created = service.createIdentification(r.userId(), r.deviceId(),
+                r.predictedDeviceType(), r.confidenceScore(), r.status());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(DeviceIdentificationResponse.from(created));
+    }
+
+    // ------------------------------------------------------- consumption-rankings
+
+    @Operation(summary = "Rankings de consumo de un usuario")
+    @GetMapping("/consumption-rankings/user/{userId}")
+    public List<ConsumptionRankingResponse> rankings(@PathVariable String userId) {
+        return service.rankingsByUser(userId).stream().map(ConsumptionRankingResponse::from).toList();
+    }
+
+    @Operation(summary = "Registra un ranking de consumo")
+    @PostMapping("/consumption-rankings")
+    public ResponseEntity<ConsumptionRankingResponse> createRanking(
+            @Valid @RequestBody CreateRankingRequest r) {
+        var items = r.rankings() == null ? List.<com.sems.analytics.domain.model.valueobjects.RankingItem>of()
+                : r.rankings().stream().map(RankingItemResource::toDomain).toList();
+        var created = service.createRanking(r.userId(), r.periodType(), r.periodStart(),
+                r.periodEnd(), items);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ConsumptionRankingResponse.from(created));
+    }
+}

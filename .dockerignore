@@ -1,0 +1,12 @@
+.git
+.idea
+target
+.env
+*.iml
+*.iws
+*.ipr
+*.log
+docker-compose.yml
+README.md
+gateway/
+scripts/
