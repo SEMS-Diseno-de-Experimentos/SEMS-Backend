@@ -12,32 +12,32 @@ public static class AuthResources
     // ------------------------------------------------------------- peticiones
 
     public sealed record RegisterRequest(
-        [property: Required(ErrorMessage = "is required")]
-        [property: EmailAddress(ErrorMessage = "must be a valid email")] string EmailAddress,
-        [property: Required(ErrorMessage = "is required")]
-        [property: MinLength(8, ErrorMessage = "must be at least 8 characters")] string Password,
+        [Required(ErrorMessage = "is required")]
+        [EmailAddress(ErrorMessage = "must be a valid email")] string EmailAddress,
+        [Required(ErrorMessage = "is required")]
+        [MinLength(8, ErrorMessage = "must be at least 8 characters")] string Password,
         string? Role);
 
     public sealed record LoginRequest(
-        [property: Required(ErrorMessage = "is required")] string EmailAddress,
-        [property: Required(ErrorMessage = "is required")] string Password);
+        [Required(ErrorMessage = "is required")] string EmailAddress,
+        [Required(ErrorMessage = "is required")] string Password);
 
     public sealed record RefreshRequest(
-        [property: Required(ErrorMessage = "is required")] string RefreshToken);
+        [Required(ErrorMessage = "is required")] string RefreshToken);
 
     public sealed record LogoutRequest(string? RefreshToken);
 
     public sealed record VerifyRequest(
-        [property: Required(ErrorMessage = "is required")] string Token);
+        [Required(ErrorMessage = "is required")] string Token);
 
     public sealed record ForgotPasswordRequest(
-        [property: Required(ErrorMessage = "is required")]
-        [property: EmailAddress(ErrorMessage = "must be a valid email")] string EmailAddress);
+        [Required(ErrorMessage = "is required")]
+        [EmailAddress(ErrorMessage = "must be a valid email")] string EmailAddress);
 
     public sealed record ResetPasswordRequest(
-        [property: Required(ErrorMessage = "is required")] string Token,
-        [property: Required(ErrorMessage = "is required")]
-        [property: MinLength(8, ErrorMessage = "must be at least 8 characters")] string NewPassword);
+        [Required(ErrorMessage = "is required")] string Token,
+        [Required(ErrorMessage = "is required")]
+        [MinLength(8, ErrorMessage = "must be at least 8 characters")] string NewPassword);
 
     // -------------------------------------------------------------- respuestas
 

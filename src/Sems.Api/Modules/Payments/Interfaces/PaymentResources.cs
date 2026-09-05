@@ -11,35 +11,35 @@ public static class PaymentResources
 
     public sealed record ProcessPaymentRequest(
         [property: JsonPropertyName("subscription_id")]
-        [property: Required(ErrorMessage = "is required")] string SubscriptionId,
+        [Required(ErrorMessage = "is required")] string SubscriptionId,
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("payment_method_id")]
-        [property: Required(ErrorMessage = "is required")] string PaymentMethodId,
+        [Required(ErrorMessage = "is required")] string PaymentMethodId,
         [property: JsonPropertyName("amount")] double Amount,
         [property: JsonPropertyName("currency")] string? Currency,
         [property: JsonPropertyName("payment_method")] string? PaymentMethod);
 
     public sealed record RegisterPaymentMethodRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("type")] string? Type,
         [property: JsonPropertyName("stripe_payment_method_id")]
-        [property: Required(ErrorMessage = "is required")] string StripePaymentMethodId,
+        [Required(ErrorMessage = "is required")] string StripePaymentMethodId,
         [property: JsonPropertyName("is_default")] bool IsDefault);
 
     /// <summary>Cuerpo que envia la aplicacion web para abrir Stripe Checkout.</summary>
     public sealed record CreateCheckoutRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("subscription_id")] string? SubscriptionId,
         [property: JsonPropertyName("plan_name")] string? PlanName,
         [property: JsonPropertyName("amount")] double Amount,
         [property: JsonPropertyName("currency")] string? Currency,
         [property: JsonPropertyName("success_url")]
-        [property: Required(ErrorMessage = "is required")] string SuccessUrl,
+        [Required(ErrorMessage = "is required")] string SuccessUrl,
         [property: JsonPropertyName("cancel_url")]
-        [property: Required(ErrorMessage = "is required")] string CancelUrl);
+        [Required(ErrorMessage = "is required")] string CancelUrl);
 
     // -------------------------------------------------------------- respuestas
 

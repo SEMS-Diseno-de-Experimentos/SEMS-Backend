@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Iam.Application;
 using static Sems.Api.Modules.Iam.Interfaces.AuthResources;
@@ -14,6 +15,7 @@ namespace Sems.Api.Modules.Iam.Interfaces;
 [ApiController]
 [Route("api/v1/auth")]
 [Tags("Authentication")]
+[AllowAnonymous]
 public sealed class AuthenticationController : ControllerBase
 {
     private readonly AuthenticationService _authentication;

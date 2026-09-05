@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Payments.Application;
 using static Sems.Api.Modules.Payments.Interfaces.PaymentResources;
@@ -144,6 +145,9 @@ public sealed class InvoiceController : ControllerBase
 /// deserializacion intermedia los alteraria y haria fallar la comprobacion.</para>
 /// </summary>
 [ApiController]
+// Stripe no manda JWT: este endpoint se autentica verificando la firma del
+// cuerpo. Pedirle sesion haria que los webhooks nunca llegasen.
+[AllowAnonymous]
 [Route("api/v1/webhooks")]
 [Tags("Webhooks")]
 public sealed class StripeWebhookController : ControllerBase

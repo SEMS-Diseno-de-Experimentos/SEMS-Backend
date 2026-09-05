@@ -16,7 +16,7 @@ public static class AnalyticsResources
 
     public sealed record CreatePredictionRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("prediction_year")] int PredictionYear,
         [property: JsonPropertyName("prediction_month")] int PredictionMonth,
         [property: JsonPropertyName("period_start")] DateTime PeriodStart,
@@ -29,7 +29,7 @@ public static class AnalyticsResources
 
     public sealed record CreateRecommendationRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("device_id")] string? DeviceId,
         [property: JsonPropertyName("recommendation_type")] string? RecommendationType,
         [property: JsonPropertyName("title")] string? Title,
@@ -40,7 +40,7 @@ public static class AnalyticsResources
 
     public sealed record CreateAnomalyRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("device_id")] string? DeviceId,
         [property: JsonPropertyName("anomaly_type")] string? AnomalyType,
         [property: JsonPropertyName("description")] string? Description,
@@ -50,7 +50,7 @@ public static class AnalyticsResources
 
     public sealed record CreateIdentificationRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("device_id")] string? DeviceId,
         [property: JsonPropertyName("predicted_device_type")] string? PredictedDeviceType,
         [property: JsonPropertyName("confidence_score")] double ConfidenceScore,
@@ -74,7 +74,7 @@ public static class AnalyticsResources
 
     public sealed record CreateRankingRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("period_type")] string? PeriodType,
         [property: JsonPropertyName("period_start")] DateTime PeriodStart,
         [property: JsonPropertyName("period_end")] DateTime PeriodEnd,

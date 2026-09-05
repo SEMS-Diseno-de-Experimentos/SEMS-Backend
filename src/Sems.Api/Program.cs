@@ -184,6 +184,53 @@ builder.Services.AddSwaggerGen(options =>
     {
         options.IncludeXmlComments(xml);
     }
+
+    // Nombre de esquema con el tipo contenedor delante: "EnergyResourcesAlertResponse"
+    // en vez de "AlertResponse".
+    //
+    // Por defecto Swashbuckle nombra los esquemas solo con Type.Name, y aqui hay
+    // dos records distintos llamados AlertResponse (uno en Energy y otro en
+    // Alerts). Al chocar, la generacion entera aborta y /swagger/v1/swagger.json
+    // devuelve 500: la pagina de Swagger carga pero se queda vacia.
+    options.CustomSchemaIds(type =>
+    {
+        var parts = new List<string>();
+        for (var t = type; t is not null; t = t.DeclaringType)
+        {
+            parts.Insert(0, t.Name.Split('`')[0]);
+        }
+
+        var name = string.Concat(parts);
+        if (type.IsGenericType)
+        {
+            name += "Of" + string.Concat(type.GetGenericArguments().Select(a => a.Name.Split('`')[0]));
+        }
+
+        return name;
+    });
+
+    // Boton "Authorize" de Swagger. Sin esto no hay forma de probar los
+    // endpoints desde la pagina, porque todos exigen sesion.
+    var bearer = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "Pegar aqui el token que devuelve /api/v1/auth/login (solo el token, sin \"Bearer\").",
+        Reference = new Microsoft.OpenApi.Models.OpenApiReference
+        {
+            Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+            Id = "Bearer"
+        }
+    };
+
+    options.AddSecurityDefinition("Bearer", bearer);
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        [bearer] = Array.Empty<string>()
+    });
 });
 
 // ------------------------------------------------------------------ seguridad
@@ -204,10 +251,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Politica de respaldo: TODO endpoint exige sesion salvo el que se marque
+    // explicitamente con [AllowAnonymous].
+    //
+    // Se hace asi, y no poniendo [Authorize] controlador por controlador,
+    // porque el olvido tiene consecuencias opuestas: si falta un [Authorize] el
+    // endpoint queda abierto y nadie se entera; si falta un [AllowAnonymous] el
+    // endpoint devuelve 401 y se ve en la primera prueba.
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 // ------------------------------------------------------------- observabilidad
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddCheck<Sems.Api.Shared.Health.DatabaseHealthCheck>(
+        "database",
+        tags: new[] { "ready" });
 
 var app = builder.Build();
 
@@ -224,24 +286,62 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHealthChecks("/health");
-// /metrics para el monitoreo continuo del Cap. VII
-app.MapMetrics("/metrics");
-
-// Carga los planes por defecto si la base esta vacia.
-using (var scope = app.Services.CreateScope())
+// /health responde a "el proceso esta vivo": sin comprobaciones, para que el
+// proveedor no reinicie el contenedor cuando lo que falla es la base de datos.
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
-    var seeder = scope.ServiceProvider.GetRequiredService<PlanSeeder>();
+    Predicate = _ => false
+}).AllowAnonymous();
+
+// /health/ready responde a "puede atender peticiones", y ahi si mira la base de
+// datos. Es el que hay que consultar para saber por que fallan los endpoints.
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+}).AllowAnonymous();
+// /metrics para el monitoreo continuo del Cap. VII
+app.MapMetrics("/metrics").AllowAnonymous();
+
+// --------------------------------------------------- preparacion de la base
+// Crea el esquema si no existe y carga los planes por defecto.
+//
+// La creacion del esquema es imprescindible y hay que pedirla explicitamente:
+// la version en Java lo resuelve con spring.jpa.hibernate.ddl-auto=update, pero
+// EF Core no crea nada por su cuenta. Sin esta llamada la aplicacion arranca
+// perfectamente, el health check responde "Healthy", y luego TODA consulta
+// falla con 500 porque las tablas no existen.
+if (!string.IsNullOrWhiteSpace(connectionString))
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+
     try
     {
-        await seeder.SeedAsync();
+        var db = services.GetRequiredService<SemsDbContext>();
+        await db.Database.EnsureCreatedAsync();
+        app.Logger.LogInformation("Esquema de base de datos verificado");
     }
     catch (Exception ex)
     {
-        // Sin base de datos configurada la aplicacion debe arrancar igual: el
-        // health check lo reportara y el fallo queda en el log.
+        // Se registra como error, no como aviso: sin esquema la aplicacion no
+        // sirve para nada y el log tiene que dejarlo claro.
+        app.Logger.LogError(ex, "No se pudo crear o verificar el esquema de la base de datos");
+    }
+
+    try
+    {
+        await services.GetRequiredService<PlanSeeder>().SeedAsync();
+    }
+    catch (Exception ex)
+    {
+        // Esto si es recuperable: sin planes la aplicacion funciona, solo que
+        // la pantalla de suscripcion sale vacia.
         app.Logger.LogWarning(ex, "No se pudieron cargar los planes por defecto");
     }
+}
+else
+{
+    app.Logger.LogWarning("DATABASE_URL no esta configurada: la aplicacion arranca sin base de datos");
 }
 
 app.Run();

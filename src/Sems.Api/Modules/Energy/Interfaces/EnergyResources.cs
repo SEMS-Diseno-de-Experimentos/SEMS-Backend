@@ -23,9 +23,9 @@ public static class EnergyResources
 
     public sealed record RegisterMeterRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("meter_serial")]
-        [property: Required(ErrorMessage = "is required")] string MeterSerial,
+        [Required(ErrorMessage = "is required")] string MeterSerial,
         [property: JsonPropertyName("model")] string? Model,
         [property: JsonPropertyName("brand")] string? Brand,
         [property: JsonPropertyName("location")] string? Location,
@@ -34,9 +34,9 @@ public static class EnergyResources
 
     public sealed record CreateReadingRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("meter_id")]
-        [property: Required(ErrorMessage = "is required")] string MeterId,
+        [Required(ErrorMessage = "is required")] string MeterId,
         [property: JsonPropertyName("device_id")] string? DeviceId,
         [property: JsonPropertyName("power_watts")] double PowerWatts,
         [property: JsonPropertyName("voltage")] double Voltage,

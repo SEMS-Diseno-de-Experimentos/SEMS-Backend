@@ -21,14 +21,14 @@ public static class SubscriptionResources
 
     public sealed record CreateSubscriptionRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("plan_id")]
-        [property: Required(ErrorMessage = "is required")] string PlanId,
+        [Required(ErrorMessage = "is required")] string PlanId,
         [property: JsonPropertyName("stripe_customer_id")] string? StripeCustomerId);
 
     public sealed record ChangePlanRequest(
         [property: JsonPropertyName("new_plan_id")]
-        [property: Required(ErrorMessage = "is required")] string NewPlanId);
+        [Required(ErrorMessage = "is required")] string NewPlanId);
 
     // ------------------------------------------- respuestas (PascalCase)
 

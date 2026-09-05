@@ -15,36 +15,36 @@ public static class DeviceResources
     // ------------------------------------------------------------- peticiones
 
     public sealed record CreateDeviceRequest(
-        [property: Required(ErrorMessage = "is required")] string ExternalDeviceCode,
-        [property: Required(ErrorMessage = "is required")] string UserId,
-        [property: Required(ErrorMessage = "is required")] string DeviceName,
-        [property: Required(ErrorMessage = "is required")] string DeviceType,
+        [Required(ErrorMessage = "is required")] string ExternalDeviceCode,
+        [Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string DeviceName,
+        [Required(ErrorMessage = "is required")] string DeviceType,
         string? Brand,
         string? Model,
-        [property: Required(ErrorMessage = "is required")] string ConnectionProtocol);
+        [Required(ErrorMessage = "is required")] string ConnectionProtocol);
 
     public sealed record UpdateDeviceRequest(
-        [property: Required(ErrorMessage = "is required")] string DeviceName,
-        [property: Required(ErrorMessage = "is required")] string DeviceType,
+        [Required(ErrorMessage = "is required")] string DeviceName,
+        [Required(ErrorMessage = "is required")] string DeviceType,
         string? Brand,
         string? Model,
-        [property: Required(ErrorMessage = "is required")] string ConnectionProtocol);
+        [Required(ErrorMessage = "is required")] string ConnectionProtocol);
 
     public sealed record UpdateDeviceStatusRequest(
-        [property: Required(ErrorMessage = "is required")] string Status);
+        [Required(ErrorMessage = "is required")] string Status);
 
     public sealed record CreateBindingRequest(
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         string? HomeId);
 
     public sealed record CreateConfigurationRequest(
-        [property: Required(ErrorMessage = "is required")] string ConfigKey,
+        [Required(ErrorMessage = "is required")] string ConfigKey,
         string? ConfigValue);
 
     public sealed record UpdateConfigurationRequest(string? ConfigValue);
 
     public sealed record CreateEventRequest(
-        [property: Required(ErrorMessage = "is required")] string EventType,
+        [Required(ErrorMessage = "is required")] string EventType,
         string? Description,
         DateTime? OccurredAt);
 

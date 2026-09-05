@@ -11,56 +11,56 @@ public static class AlertResources
 
     public sealed record CreateAlertRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("device_id")]
-        [property: Required(ErrorMessage = "is required")] string DeviceId,
+        [Required(ErrorMessage = "is required")] string DeviceId,
         [property: JsonPropertyName("threshold_id")] string? ThresholdId,
         [property: JsonPropertyName("inactivity_rule_id")] string? InactivityRuleId,
         [property: JsonPropertyName("alert_type")]
-        [property: Required(ErrorMessage = "is required")] string AlertType,
+        [Required(ErrorMessage = "is required")] string AlertType,
         [property: JsonPropertyName("title")]
-        [property: Required(ErrorMessage = "is required")] string Title,
+        [Required(ErrorMessage = "is required")] string Title,
         [property: JsonPropertyName("message")]
-        [property: Required(ErrorMessage = "is required")] string Message,
+        [Required(ErrorMessage = "is required")] string Message,
         [property: JsonPropertyName("severity")]
-        [property: Required(ErrorMessage = "is required")] string Severity,
+        [Required(ErrorMessage = "is required")] string Severity,
         [property: JsonPropertyName("status")] string? Status,
         [property: JsonPropertyName("triggered_at")] DateTime? TriggeredAt);
 
     public sealed record UpdateAlertStatusRequest(
         [property: JsonPropertyName("status")]
-        [property: Required(ErrorMessage = "is required")] string Status,
+        [Required(ErrorMessage = "is required")] string Status,
         [property: JsonPropertyName("resolved_at")] DateTime? ResolvedAt);
 
     public sealed record CreateThresholdRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("device_id")]
-        [property: Required(ErrorMessage = "is required")] string DeviceId,
+        [Required(ErrorMessage = "is required")] string DeviceId,
         [property: JsonPropertyName("threshold_name")]
-        [property: Required(ErrorMessage = "is required")] string ThresholdName,
+        [Required(ErrorMessage = "is required")] string ThresholdName,
         [property: JsonPropertyName("metric")]
-        [property: Required(ErrorMessage = "is required")] string Metric,
+        [Required(ErrorMessage = "is required")] string Metric,
         [property: JsonPropertyName("operator")]
-        [property: Required(ErrorMessage = "is required")] string Operator,
+        [Required(ErrorMessage = "is required")] string Operator,
         [property: JsonPropertyName("threshold_value")] double ThresholdValue,
         [property: JsonPropertyName("active")] bool? Active);
 
     public sealed record CreateInactivityRuleRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("device_id")]
-        [property: Required(ErrorMessage = "is required")] string DeviceId,
+        [Required(ErrorMessage = "is required")] string DeviceId,
         [property: JsonPropertyName("rule_name")]
-        [property: Required(ErrorMessage = "is required")] string RuleName,
+        [Required(ErrorMessage = "is required")] string RuleName,
         [property: JsonPropertyName("max_inactive_minutes")] int MaxInactiveMinutes,
         [property: JsonPropertyName("active")] bool Active);
 
     public sealed record CreatePreferenceRequest(
         [property: JsonPropertyName("user_id")]
-        [property: Required(ErrorMessage = "is required")] string UserId,
+        [Required(ErrorMessage = "is required")] string UserId,
         [property: JsonPropertyName("channel")]
-        [property: Required(ErrorMessage = "is required")] string Channel,
+        [Required(ErrorMessage = "is required")] string Channel,
         [property: JsonPropertyName("enabled")] bool Enabled,
         [property: JsonPropertyName("min_severity")] string? MinSeverity,
         [property: JsonPropertyName("quiet_hours_start")] DateTime? QuietHoursStart,
