@@ -1,5 +1,6 @@
 using Sems.Api.Modules.Devices.Domain.Model;
 using Sems.Api.Modules.Devices.Domain.Repositories;
+using Sems.Api.Modules.Devices.Domain.Services;
 using Sems.Api.Shared.Errors;
 using Sems.Api.Shared.Events;
 
@@ -19,21 +20,24 @@ public sealed class DeviceCommandService
     private readonly IDeviceBindingRepository _bindings;
     private readonly IDeviceConfigurationRepository _configurations;
     private readonly IDeviceEventRepository _events;
+    private readonly ISiteDirectory _sites;
     private readonly IDomainEventBus _bus;
 
     public DeviceCommandService(IDeviceRepository devices, IDeviceBindingRepository bindings,
         IDeviceConfigurationRepository configurations, IDeviceEventRepository events,
-        IDomainEventBus bus)
+        ISiteDirectory sites, IDomainEventBus bus)
     {
         _devices = devices;
         _bindings = bindings;
         _configurations = configurations;
         _events = events;
+        _sites = sites;
         _bus = bus;
     }
 
-    public async Task<Device> RegisterAsync(string? externalCode, Guid userId, string? name,
-        string? type, string? brand, string? model, string? protocol, CancellationToken ct = default)
+    public async Task<Device> RegisterAsync(string? externalCode, Guid userId, Guid siteId,
+        Guid? zoneId, string? name, string? type, string? brand, string? model, string? protocol,
+        CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(externalCode)
             && await _devices.ExistsByExternalCodeAsync(externalCode.Trim(), ct))
@@ -41,7 +45,9 @@ public sealed class DeviceCommandService
             throw AppException.Conflict("a device with that external_device_code already exists");
         }
 
-        var device = Device.Register(externalCode, userId, name, type, brand, model,
+        await ValidarUbicacionAsync(siteId, zoneId, ct);
+
+        var device = Device.Register(externalCode, userId, siteId, zoneId, name, type, brand, model,
             DeviceEnums.ToConnectionProtocol(protocol));
 
         _bus.Publish(new DomainEvents.DeviceRegistered(device.UserId, device.DeviceId,
@@ -51,11 +57,37 @@ public sealed class DeviceCommandService
     }
 
     public async Task<Device> UpdateAsync(Guid deviceId, string? name, string? type, string? brand,
-        string? model, string? protocol, CancellationToken ct = default)
+        string? model, string? protocol, Guid? zoneId, CancellationToken ct = default)
     {
         var device = await RequireAsync(deviceId, ct);
-        device.UpdateDetails(name, type, brand, model, DeviceEnums.ToConnectionProtocol(protocol));
+
+        // La zona nueva tiene que ser del mismo local. Sin comprobarlo se podria
+        // mover un equipo al local de otra empresa pasando el identificador a
+        // mano, y su consumo empezaria a contar en la factura equivocada.
+        if (zoneId is not null && zoneId != Guid.Empty
+            && !await _sites.ZoneBelongsToSiteAsync(zoneId.Value, device.SiteId, ct))
+        {
+            throw AppException.Validation("the zone does not belong to this device's site");
+        }
+
+        device.UpdateDetails(name, type, brand, model, DeviceEnums.ToConnectionProtocol(protocol),
+            zoneId);
         return await _devices.SaveAsync(device, ct);
+    }
+
+    /// <summary>Comprueba que el local existe y que la zona es suya.</summary>
+    private async Task ValidarUbicacionAsync(Guid siteId, Guid? zoneId, CancellationToken ct)
+    {
+        if (!await _sites.SiteIsActiveAsync(siteId, ct))
+        {
+            throw AppException.NotFound("site not found or not active");
+        }
+
+        if (zoneId is not null && zoneId != Guid.Empty
+            && !await _sites.ZoneBelongsToSiteAsync(zoneId.Value, siteId, ct))
+        {
+            throw AppException.Validation("the zone does not belong to the given site");
+        }
     }
 
     public async Task<Device> ChangeStatusAsync(Guid deviceId, string? status,
@@ -82,7 +114,7 @@ public sealed class DeviceCommandService
         await _devices.SaveAsync(device, ct);
     }
 
-    public async Task<DeviceBinding> BindAsync(Guid deviceId, Guid userId, Guid? homeId,
+    public async Task<DeviceBinding> BindAsync(Guid deviceId, Guid userId, Guid? siteId,
         CancellationToken ct = default)
     {
         var device = await RequireAsync(deviceId, ct);
@@ -93,7 +125,7 @@ public sealed class DeviceCommandService
             throw AppException.Conflict("device already has an active binding");
         }
 
-        var binding = DeviceBinding.Create(deviceId, userId, homeId);
+        var binding = DeviceBinding.Create(deviceId, userId, siteId);
         _bus.Publish(new DomainEvents.DeviceLinked(userId, deviceId, binding.BindingId));
 
         return await _bindings.SaveAsync(binding, ct);
@@ -179,6 +211,14 @@ public sealed class DeviceQueryService
 
     public Task<List<Device>> DevicesByUserAsync(Guid userId, CancellationToken ct = default) =>
         _devices.FindByUserIdAsync(userId, ct);
+
+    /// <summary>Dispositivos instalados en un local.</summary>
+    public Task<List<Device>> DevicesBySiteAsync(Guid siteId, CancellationToken ct = default) =>
+        _devices.FindBySiteIdAsync(siteId, ct);
+
+    /// <summary>Dispositivos de una zona concreta.</summary>
+    public Task<List<Device>> DevicesByZoneAsync(Guid zoneId, CancellationToken ct = default) =>
+        _devices.FindByZoneIdAsync(zoneId, ct);
 
     public Task<List<DeviceBinding>> BindingsByDeviceAsync(Guid deviceId, CancellationToken ct = default) =>
         _bindings.FindByDeviceIdAsync(deviceId, ct);

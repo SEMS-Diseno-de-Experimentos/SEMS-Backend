@@ -17,7 +17,7 @@ public enum DeviceStatus
     REMOVED
 }
 
-/// <summary>Estado del vinculo entre un dispositivo y un usuario u hogar.</summary>
+/// <summary>Estado del vinculo entre un dispositivo y quien lo opera.</summary>
 public enum BindingStatus
 {
     LINKED,

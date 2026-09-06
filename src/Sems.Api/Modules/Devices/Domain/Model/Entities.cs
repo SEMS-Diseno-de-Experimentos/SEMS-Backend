@@ -2,7 +2,7 @@ using Sems.Api.Shared.Errors;
 
 namespace Sems.Api.Modules.Devices.Domain.Model;
 
-/// <summary>Vinculo entre un dispositivo y el usuario u hogar que lo utiliza.</summary>
+/// <summary>Vinculo entre un dispositivo y la persona que lo opera, en un local.</summary>
 public class DeviceBinding
 {
     public Guid BindingId { get; private set; }
@@ -11,7 +11,7 @@ public class DeviceBinding
 
     public Guid UserId { get; private set; }
 
-    public Guid? HomeId { get; private set; }
+    public Guid? SiteId { get; private set; }
 
     public BindingStatus BindingStatus { get; private set; }
 
@@ -25,7 +25,7 @@ public class DeviceBinding
     {
     }
 
-    public static DeviceBinding Create(Guid deviceId, Guid userId, Guid? homeId)
+    public static DeviceBinding Create(Guid deviceId, Guid userId, Guid? siteId)
     {
         if (deviceId == Guid.Empty)
         {
@@ -42,7 +42,7 @@ public class DeviceBinding
             BindingId = Guid.NewGuid(),
             DeviceId = deviceId,
             UserId = userId,
-            HomeId = homeId,
+            SiteId = siteId,
             BindingStatus = BindingStatus.LINKED,
             LinkedAt = now,
             UpdatedAt = now

@@ -17,6 +17,11 @@ public static class DeviceResources
     public sealed record CreateDeviceRequest(
         [Required(ErrorMessage = "is required")] string ExternalDeviceCode,
         [Required(ErrorMessage = "is required")] string UserId,
+        // El local es obligatorio: el medidor, el contrato y la factura son
+        // suyos, no de la persona que da de alta el equipo.
+        [Required(ErrorMessage = "is required")] string SiteId,
+        // La zona no: al abrir un local puede que aun no esten definidas.
+        string? ZoneId,
         [Required(ErrorMessage = "is required")] string DeviceName,
         [Required(ErrorMessage = "is required")] string DeviceType,
         string? Brand,
@@ -28,14 +33,16 @@ public static class DeviceResources
         [Required(ErrorMessage = "is required")] string DeviceType,
         string? Brand,
         string? Model,
-        [Required(ErrorMessage = "is required")] string ConnectionProtocol);
+        [Required(ErrorMessage = "is required")] string ConnectionProtocol,
+        // Un equipo se traslada de zona; de local no, que seria otro suministro.
+        string? ZoneId);
 
     public sealed record UpdateDeviceStatusRequest(
         [Required(ErrorMessage = "is required")] string Status);
 
     public sealed record CreateBindingRequest(
         [Required(ErrorMessage = "is required")] string UserId,
-        string? HomeId);
+        string? SiteId);
 
     public sealed record CreateConfigurationRequest(
         [Required(ErrorMessage = "is required")] string ConfigKey,
@@ -51,28 +58,30 @@ public static class DeviceResources
     // -------------------------------------------------------------- respuestas
 
     public sealed record DeviceResource(
-        string DeviceId, string ExternalDeviceCode, string UserId, string DeviceName,
-        string DeviceType,
+        string DeviceId, string ExternalDeviceCode, string UserId, string SiteId,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ZoneId,
+        string DeviceName, string DeviceType,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Brand,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Model,
         string ConnectionProtocol, string Status, DateTime RegisteredAt, DateTime UpdatedAt)
     {
         public static DeviceResource From(Device d) => new(
-            d.DeviceId.ToString(), d.ExternalDeviceCode, d.UserId.ToString(), d.DeviceName,
+            d.DeviceId.ToString(), d.ExternalDeviceCode, d.UserId.ToString(),
+            d.SiteId.ToString(), d.ZoneId?.ToString(), d.DeviceName,
             d.DeviceType, d.Brand, d.Model, d.ConnectionProtocol.ToString(), d.Status.ToString(),
             d.RegisteredAt, d.UpdatedAt);
     }
 
     public sealed record DeviceBindingResource(
         string BindingId, string DeviceId, string UserId,
-        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? HomeId,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SiteId,
         string BindingStatus, DateTime LinkedAt,
         [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTime? UnlinkedAt,
         DateTime UpdatedAt)
     {
         public static DeviceBindingResource From(DeviceBinding b) => new(
             b.BindingId.ToString(), b.DeviceId.ToString(), b.UserId.ToString(),
-            b.HomeId?.ToString(), b.BindingStatus.ToString(), b.LinkedAt, b.UnlinkedAt, b.UpdatedAt);
+            b.SiteId?.ToString(), b.BindingStatus.ToString(), b.LinkedAt, b.UnlinkedAt, b.UpdatedAt);
     }
 
     public sealed record DeviceConfigurationResource(

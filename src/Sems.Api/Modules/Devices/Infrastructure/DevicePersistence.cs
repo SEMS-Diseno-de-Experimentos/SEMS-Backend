@@ -27,6 +27,8 @@ public sealed class DeviceConfig : IEntityTypeConfiguration<Device>
         builder.Property(d => d.ConnectionProtocol).HasConversion<string>().HasMaxLength(20);
         builder.Property(d => d.Status).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(d => d.UserId);
+        builder.HasIndex(d => d.SiteId);
+        builder.HasIndex(d => d.ZoneId);
         builder.HasIndex(d => d.ExternalDeviceCode).IsUnique();
     }
 }
@@ -105,6 +107,17 @@ public sealed class DeviceRepository : IDeviceRepository
     public Task<List<Device>> FindByUserIdAsync(Guid userId, CancellationToken ct = default) =>
         _db.Set<Device>().Where(d => d.UserId == userId && d.Status != DeviceStatus.REMOVED)
             .OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
+
+    public Task<List<Device>> FindBySiteIdAsync(Guid siteId, CancellationToken ct = default) =>
+        _db.Set<Device>().Where(d => d.SiteId == siteId && d.Status != DeviceStatus.REMOVED)
+            .OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
+
+    public Task<List<Device>> FindByZoneIdAsync(Guid zoneId, CancellationToken ct = default) =>
+        _db.Set<Device>().Where(d => d.ZoneId == zoneId && d.Status != DeviceStatus.REMOVED)
+            .OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
+
+    public Task<int> CountBySiteIdAsync(Guid siteId, CancellationToken ct = default) =>
+        _db.Set<Device>().CountAsync(d => d.SiteId == siteId && d.Status != DeviceStatus.REMOVED, ct);
 
     public Task<bool> ExistsByExternalCodeAsync(string externalDeviceCode, CancellationToken ct = default) =>
         _db.Set<Device>().AnyAsync(d => d.ExternalDeviceCode == externalDeviceCode, ct);

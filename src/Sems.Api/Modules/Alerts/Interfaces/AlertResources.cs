@@ -66,6 +66,38 @@ public static class AlertResources
         [property: JsonPropertyName("quiet_hours_start")] DateTime? QuietHoursStart,
         [property: JsonPropertyName("quiet_hours_end")] DateTime? QuietHoursEnd);
 
+    public sealed record CreateDemandRuleRequest(
+        [property: JsonPropertyName("site_id")]
+        [Required(ErrorMessage = "is required")] string SiteId,
+        [property: JsonPropertyName("user_id")]
+        [Required(ErrorMessage = "is required")] string UserId,
+        [property: JsonPropertyName("rule_name")] string? RuleName,
+        [property: JsonPropertyName("contracted_power_kw")]
+        [Required(ErrorMessage = "is required")] double ContractedPowerKw,
+        [property: JsonPropertyName("warning_percent")] double? WarningPercent,
+        [property: JsonPropertyName("active")] bool? Active);
+
+    public sealed record EvaluateDemandRequest(
+        [property: JsonPropertyName("demand_kw")]
+        [Required(ErrorMessage = "is required")] double DemandKw);
+
+    public sealed record DemandRuleResponse(
+        [property: JsonPropertyName("demand_rule_id")] string DemandRuleId,
+        [property: JsonPropertyName("site_id")] string SiteId,
+        [property: JsonPropertyName("user_id")] string UserId,
+        [property: JsonPropertyName("rule_name")] string? RuleName,
+        [property: JsonPropertyName("contracted_power_kw")] double ContractedPowerKw,
+        [property: JsonPropertyName("warning_percent")] double WarningPercent,
+        [property: JsonPropertyName("warning_threshold_kw")] double WarningThresholdKw,
+        [property: JsonPropertyName("active")] bool Active,
+        [property: JsonPropertyName("created_at")] DateTime CreatedAt)
+    {
+        public static DemandRuleResponse From(DemandRule r) => new(
+            r.DemandRuleId.ToString(), r.SiteId.ToString(), r.UserId.ToString(), r.RuleName,
+            r.ContractedPowerKw, r.WarningPercent, Math.Round(r.UmbralDeAvisoKw, 2), r.Active,
+            r.CreatedAt);
+    }
+
     // -------------------------------------------------------------- respuestas
 
     public sealed record AlertResponse(

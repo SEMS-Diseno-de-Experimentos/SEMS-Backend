@@ -29,10 +29,24 @@ public sealed record EmailAddress
     public override string ToString() => Value;
 }
 
-/// <summary>Roles del sistema.</summary>
+/// <summary>
+/// Rol de la persona en la plataforma.
+/// </summary>
+/// <remarks>
+/// <para>Es distinto del papel que tiene dentro de una organizacion, que vive
+/// en el modulo de organizaciones y decide que locales puede ver. Aqui solo se
+/// distingue a quien usa el producto de quien lo administra.</para>
+///
+/// <para>Antes el rol por defecto se llamaba RESIDENT, del segmento
+/// residencial. Ya no describe a nadie: quien entra ahora es el personal de un
+/// establecimiento.</para>
+/// </remarks>
 public enum RoleName
 {
-    RESIDENT,
+    /// <summary>Personal de un establecimiento. Es el rol por defecto.</summary>
+    STAFF,
+
+    /// <summary>Administrador de la plataforma.</summary>
     ADMIN
 }
 
@@ -40,7 +54,7 @@ public static class RoleNameExtensions
 {
     public static RoleName ToRoleName(string? value) =>
         string.IsNullOrWhiteSpace(value)
-            ? RoleName.RESIDENT
+            ? RoleName.STAFF
             : Enum.TryParse<RoleName>(value.Trim(), ignoreCase: true, out var r) && Enum.IsDefined(r)
                 ? r
                 : throw AppException.Validation("role is invalid");

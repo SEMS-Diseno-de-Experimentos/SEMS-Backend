@@ -120,6 +120,35 @@ public sealed class EnergyCommandService
 
     public EnergyPrice CurrentPrice() => _pricing.CurrentPrice();
 
+    /// <summary>Tarifa comercial vigente para una categoria del pliego.</summary>
+    public CommercialTariff CurrentTariff(string? tariffCategory) =>
+        _pricing.CurrentTariff(tariffCategory);
+
+    /// <summary>
+    /// Estima la factura del mes de un local a partir de su consumo por franja
+    /// y de la demanda maxima registrada.
+    /// </summary>
+    /// <remarks>
+    /// El local aporta la categoria tarifaria y la potencia contratada; energia
+    /// no los guarda ni los consulta, para no depender del modulo de
+    /// organizaciones. Es quien llama el que los trae.
+    /// </remarks>
+    public BillBreakdown EstimateBill(string? tariffCategory, decimal kwhPunta,
+        decimal kwhFueraDePunta, decimal demandaMaximaKw, decimal potenciaContratadaKw)
+    {
+        if (kwhPunta < 0 || kwhFueraDePunta < 0 || demandaMaximaKw < 0)
+        {
+            throw AppException.Validation("consumption and demand cannot be negative");
+        }
+        if (potenciaContratadaKw <= 0)
+        {
+            throw AppException.Validation("contracted_power_kw must be greater than zero");
+        }
+
+        return _pricing.CurrentTariff(tariffCategory)
+            .Calcular(kwhPunta, kwhFueraDePunta, demandaMaximaKw, potenciaContratadaKw);
+    }
+
     private async Task<ConsumptionAlert> RequireAlertAsync(Guid alertId, CancellationToken ct) =>
         await _alerts.FindByIdAsync(alertId, ct)
         ?? throw AppException.NotFound($"Alert '{alertId}' not found");

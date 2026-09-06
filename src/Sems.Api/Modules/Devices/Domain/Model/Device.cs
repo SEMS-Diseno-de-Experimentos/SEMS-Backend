@@ -18,6 +18,23 @@ public class Device
 
     public Guid UserId { get; private set; }
 
+    /// <summary>Local en el que esta instalado. Obligatorio.</summary>
+    /// <remarks>
+    /// El medidor, el contrato y la factura son del local, no de la persona.
+    /// Sin este dato no se puede saber a que suministro imputar el consumo, que
+    /// es justo lo que se hace con el en el segmento de establecimientos.
+    /// </remarks>
+    public Guid SiteId { get; private set; }
+
+    /// <summary>Zona concreta dentro del local. Opcional.</summary>
+    /// <remarks>
+    /// Se admite vacia porque al dar de alta un local puede que aun no esten
+    /// definidas las zonas, y bloquear el alta del medidor por eso seria
+    /// molesto. En cuanto existe, permite separar el consumo de las camaras del
+    /// de la sala de ventas.
+    /// </remarks>
+    public Guid? ZoneId { get; private set; }
+
     public string DeviceName { get; private set; } = string.Empty;
 
     public string DeviceType { get; private set; } = string.Empty;
@@ -44,8 +61,8 @@ public class Device
     /// obligatorio antes de construir, de modo que un Device recien creado
     /// siempre es valido.
     /// </summary>
-    public static Device Register(string? externalCode, Guid userId, string? name,
-        string? deviceType, string? brand, string? model, ConnectionProtocol protocol)
+    public static Device Register(string? externalCode, Guid userId, Guid siteId, Guid? zoneId,
+        string? name, string? deviceType, string? brand, string? model, ConnectionProtocol protocol)
     {
         if (string.IsNullOrWhiteSpace(externalCode))
         {
@@ -54,6 +71,10 @@ public class Device
         if (userId == Guid.Empty)
         {
             throw AppException.Validation("user_id is required");
+        }
+        if (siteId == Guid.Empty)
+        {
+            throw AppException.Validation("site_id is required");
         }
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -70,6 +91,8 @@ public class Device
             DeviceId = Guid.NewGuid(),
             ExternalDeviceCode = externalCode.Trim(),
             UserId = userId,
+            SiteId = siteId,
+            ZoneId = zoneId == Guid.Empty ? null : zoneId,
             DeviceName = name.Trim(),
             DeviceType = deviceType.Trim(),
             Brand = NormalizeOptional(brand),
@@ -83,7 +106,7 @@ public class Device
 
     /// <summary>Un dispositivo eliminado queda congelado y ya no admite ediciones.</summary>
     public void UpdateDetails(string? name, string? deviceType, string? brand, string? model,
-        ConnectionProtocol protocol)
+        ConnectionProtocol protocol, Guid? zoneId)
     {
         if (IsRemoved)
         {
@@ -103,6 +126,10 @@ public class Device
         Brand = NormalizeOptional(brand);
         Model = NormalizeOptional(model);
         ConnectionProtocol = protocol;
+        // La zona si se puede cambiar: un equipo se traslada de la sala de
+        // ventas al almacen sin dejar de ser el mismo equipo. El local no, que
+        // seria otro suministro y rompería la continuidad del historico.
+        ZoneId = zoneId == Guid.Empty ? null : zoneId;
         UpdatedAt = DateTime.UtcNow;
     }
 

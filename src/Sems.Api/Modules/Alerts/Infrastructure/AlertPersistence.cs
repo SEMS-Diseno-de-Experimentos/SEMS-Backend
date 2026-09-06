@@ -98,6 +98,41 @@ public sealed class AlertRepository : IAlertRepository
             .OrderByDescending(a => a.TriggeredAt).ToListAsync(ct);
 }
 
+public sealed class DemandRuleConfig : IEntityTypeConfiguration<DemandRule>
+{
+    public void Configure(EntityTypeBuilder<DemandRule> b)
+    {
+        b.ToTable("al_demand_rules");
+        b.HasKey(r => r.DemandRuleId);
+        b.Property(r => r.RuleName).HasMaxLength(160);
+        b.HasIndex(r => r.SiteId);
+        b.HasIndex(r => r.UserId);
+    }
+}
+
+public sealed class DemandRuleRepository : IDemandRuleRepository
+{
+    private readonly SemsDbContext _db;
+    public DemandRuleRepository(SemsDbContext db) => _db = db;
+
+    public async Task<DemandRule> SaveAsync(DemandRule r, CancellationToken ct = default)
+    {
+        if (_db.Entry(r).State == EntityState.Detached) _db.Add(r);
+        await _db.SaveChangesAsync(ct);
+        return r;
+    }
+
+    public Task<DemandRule?> FindByIdAsync(Guid demandRuleId, CancellationToken ct = default) =>
+        _db.Set<DemandRule>().FirstOrDefaultAsync(r => r.DemandRuleId == demandRuleId, ct);
+
+    public Task<List<DemandRule>> FindActiveBySiteIdAsync(Guid siteId, CancellationToken ct = default) =>
+        _db.Set<DemandRule>().Where(r => r.SiteId == siteId && r.Active).ToListAsync(ct);
+
+    public Task<List<DemandRule>> FindByUserIdAsync(Guid userId, CancellationToken ct = default) =>
+        _db.Set<DemandRule>().Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.CreatedAt).ToListAsync(ct);
+}
+
 public sealed class ThresholdRepository : IThresholdRepository
 {
     private readonly SemsDbContext _db;

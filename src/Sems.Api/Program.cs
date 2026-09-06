@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Prometheus;
 using Sems.Api.Modules.Devices.Application;
 using Sems.Api.Modules.Devices.Domain.Repositories;
+using Sems.Api.Modules.Devices.Domain.Services;
 using Sems.Api.Modules.Devices.Infrastructure;
 using Sems.Api.Modules.Energy.Application;
 using Sems.Api.Modules.Energy.Domain.Repositories;
@@ -10,7 +11,11 @@ using Sems.Api.Modules.Energy.Domain.Services;
 using Sems.Api.Modules.Energy.Infrastructure;
 using Sems.Api.Modules.Analytics.Application;
 using Sems.Api.Modules.Analytics.Domain.Repositories;
+using Sems.Api.Modules.Analytics.Domain.Services;
 using Sems.Api.Modules.Analytics.Infrastructure;
+using Sems.Api.Modules.Organizations.Application;
+using Sems.Api.Modules.Organizations.Domain.Repositories;
+using Sems.Api.Modules.Organizations.Infrastructure;
 using Sems.Api.Modules.Subscriptions.Application;
 using Sems.Api.Modules.Subscriptions.Domain.Repositories;
 using Sems.Api.Modules.Subscriptions.Domain.Services;
@@ -87,6 +92,8 @@ builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
 builder.Services.AddScoped<IDeviceBindingRepository, DeviceBindingRepository>();
 builder.Services.AddScoped<IDeviceConfigurationRepository, DeviceConfigurationRepository>();
 builder.Services.AddScoped<IDeviceEventRepository, DeviceEventRepository>();
+// El puerto que dispositivos usa para saber si un local y una zona existen.
+builder.Services.AddScoped<ISiteDirectory, OrganizationsSiteDirectory>();
 builder.Services.AddScoped<DeviceCommandService>();
 builder.Services.AddScoped<DeviceQueryService>();
 
@@ -103,6 +110,7 @@ builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>(
 builder.Services.AddScoped<IAnomalyRepository, AnomalyRepository>();
 builder.Services.AddScoped<IDeviceIdentificationRepository, DeviceIdentificationRepository>();
 builder.Services.AddScoped<IConsumptionRankingRepository, ConsumptionRankingRepository>();
+builder.Services.AddScoped<IBillCalculator, EnergyBillCalculator>();
 builder.Services.AddScoped<AnalyticsService>();
 
 builder.Services.AddScoped<IPlanRepository, PlanRepository>();
@@ -110,6 +118,16 @@ builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
 builder.Services.AddSingleton<SubscriptionManager>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<PlanSeeder>();
+
+// Organizaciones: la empresa, sus locales, las zonas de cada local y quien
+// tiene acceso a que. Es el nivel que sustituye a la vivienda del segmento
+// anterior.
+builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+builder.Services.AddScoped<ISiteRepository, SiteRepository>();
+builder.Services.AddScoped<IZoneRepository, ZoneRepository>();
+builder.Services.AddScoped<IMembershipRepository, MembershipRepository>();
+builder.Services.AddScoped<OrganizationCommandService>();
+builder.Services.AddScoped<OrganizationQueryService>();
 
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IPaymentMethodRepository, PaymentMethodRepository>();
@@ -125,6 +143,7 @@ builder.Services.AddScoped<WebhookCommandService>();
 builder.Services.AddScoped<IAlertRepository, AlertRepository>();
 builder.Services.AddScoped<IThresholdRepository, ThresholdRepository>();
 builder.Services.AddScoped<IInactivityRuleRepository, InactivityRuleRepository>();
+builder.Services.AddScoped<IDemandRuleRepository, DemandRuleRepository>();
 builder.Services.AddScoped<INotificationPreferenceRepository, NotificationPreferenceRepository>();
 builder.Services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();

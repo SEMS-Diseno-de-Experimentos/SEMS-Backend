@@ -168,7 +168,7 @@ public sealed class AlertTriggeredHandler : IDomainEventHandler<DomainEvents.Ale
             return;
         }
 
-        await _notifications.SendEmailAsync(e.AlertId, email, "Alerta de consumo en tu hogar",
+        await _notifications.SendEmailAsync(e.AlertId, email, "Alerta de consumo en tu local",
             $"""
              Hola:
 

@@ -94,14 +94,40 @@ public static class AnalyticsResources
         [property: JsonPropertyName("currency")] string Currency,
         [property: JsonPropertyName("tariff_used")] double TariffUsed,
         [property: JsonPropertyName("error_margin_percentage")] double ErrorMarginPercentage,
+        [property: JsonPropertyName("site_id")] string? SiteId,
+        [property: JsonPropertyName("estimated_kwh_peak")] double EstimatedKwhPeak,
+        [property: JsonPropertyName("estimated_kwh_off_peak")] double EstimatedKwhOffPeak,
+        [property: JsonPropertyName("estimated_max_demand_kw")] double EstimatedMaxDemandKw,
+        [property: JsonPropertyName("energy_cost")] double EnergyCost,
+        [property: JsonPropertyName("power_cost")] double PowerCost,
         [property: JsonPropertyName("generated_at")] DateTime GeneratedAt,
         [property: JsonPropertyName("created_at")] DateTime CreatedAt)
     {
         public static BillPredictionResponse From(BillPrediction p) => new(p.Id.ToString(),
             p.UserId, p.PredictionYear, p.PredictionMonth, p.PeriodStart, p.PeriodEnd,
             p.EstimatedKwh, p.EstimatedAmount, p.Currency, p.TariffUsed, p.ErrorMarginPercentage,
-            p.GeneratedAt, p.CreatedAt);
+            p.SiteId, p.EstimatedKwhPeak, p.EstimatedKwhOffPeak, p.EstimatedMaxDemandKw,
+            p.EnergyCost, p.PowerCost, p.GeneratedAt, p.CreatedAt);
     }
+
+    /// <summary>Peticion de proyeccion de recibo para un local.</summary>
+    public sealed record ForecastSiteBillRequest(
+        [property: JsonPropertyName("user_id")]
+        [Required(ErrorMessage = "is required")] string UserId,
+        [property: JsonPropertyName("site_id")]
+        [Required(ErrorMessage = "is required")] string SiteId,
+        [property: JsonPropertyName("tariff_category")]
+        [Required(ErrorMessage = "is required")] string TariffCategory,
+        [property: JsonPropertyName("contracted_power_kw")]
+        [Required(ErrorMessage = "is required")] double ContractedPowerKw,
+        [property: JsonPropertyName("prediction_year")] int PredictionYear,
+        [property: JsonPropertyName("prediction_month")] int PredictionMonth,
+        [property: JsonPropertyName("period_start")] DateTime PeriodStart,
+        [property: JsonPropertyName("period_end")] DateTime PeriodEnd,
+        [property: JsonPropertyName("kwh_peak")] double KwhPeak,
+        [property: JsonPropertyName("kwh_off_peak")] double KwhOffPeak,
+        [property: JsonPropertyName("max_demand_kw")] double MaxDemandKw,
+        [property: JsonPropertyName("error_margin_percentage")] double ErrorMarginPercentage);
 
     public sealed record RecommendationResponse(
         [property: JsonPropertyName("id")] string Id,

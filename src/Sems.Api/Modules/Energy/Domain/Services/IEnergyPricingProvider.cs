@@ -11,4 +11,14 @@ namespace Sems.Api.Modules.Energy.Domain.Services;
 public interface IEnergyPricingProvider
 {
     EnergyPrice CurrentPrice();
+
+    /// <summary>
+    /// Tarifa comercial vigente para una categoria del pliego.
+    /// </summary>
+    /// <remarks>
+    /// La categoria llega como texto y no como enum de otro modulo a proposito:
+    /// energia no debe depender del bounded context de organizaciones. Es quien
+    /// llama el que traduce, igual que ocurre con el tipo de dispositivo.
+    /// </remarks>
+    CommercialTariff CurrentTariff(string? tariffCategory);
 }

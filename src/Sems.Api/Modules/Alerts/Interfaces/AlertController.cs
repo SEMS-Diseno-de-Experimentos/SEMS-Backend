@@ -108,6 +108,34 @@ public sealed class AlertController : ControllerBase
     public async Task<List<PreferenceResponse>> PreferencesByUser(Guid userId) =>
         (await _queries.PreferencesByUserAsync(userId)).Select(PreferenceResponse.From).ToList();
 
+    // ------------------------------------------------------ reglas de demanda
+
+    /// <summary>Crea una regla de vigilancia de demanda para un local.</summary>
+    [HttpPost("demand-rules")]
+    public async Task<ActionResult<DemandRuleResponse>> CreateDemandRule(
+        [FromBody] CreateDemandRuleRequest request)
+    {
+        var regla = await _commands.CreateDemandRuleAsync(Guid.Parse(request.SiteId),
+            Guid.Parse(request.UserId), request.RuleName, request.ContractedPowerKw,
+            request.WarningPercent, request.Active);
+        return StatusCode(StatusCodes.Status201Created, DemandRuleResponse.From(regla));
+    }
+
+    /// <summary>Reglas de demanda activas de un local.</summary>
+    [HttpGet("sites/{siteId:guid}/demand-rules")]
+    public async Task<List<DemandRuleResponse>> DemandRulesBySite(Guid siteId) =>
+        (await _commands.DemandRulesBySiteAsync(siteId)).Select(DemandRuleResponse.From).ToList();
+
+    /// <summary>
+    /// Evalua una demanda medida contra las reglas del local y levanta las
+    /// alertas que correspondan.
+    /// </summary>
+    [HttpPost("sites/{siteId:guid}/demand-evaluations")]
+    public async Task<List<AlertResponse>> EvaluateDemand(Guid siteId,
+        [FromBody] EvaluateDemandRequest request) =>
+        (await _commands.EvaluateDemandAsync(siteId, request.DemandKw))
+            .Select(AlertResponse.From).ToList();
+
     private static Guid? OptionalGuid(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : Guid.Parse(value);
 }

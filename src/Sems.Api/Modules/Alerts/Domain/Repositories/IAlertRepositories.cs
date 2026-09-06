@@ -20,6 +20,15 @@ public interface IThresholdRepository
     Task<List<AlertThreshold>> FindActiveByDeviceIdAsync(Guid? deviceId, CancellationToken ct = default);
 }
 
+public interface IDemandRuleRepository
+{
+    Task<DemandRule> SaveAsync(DemandRule rule, CancellationToken ct = default);
+    Task<DemandRule?> FindByIdAsync(Guid demandRuleId, CancellationToken ct = default);
+    /// <summary>Reglas activas de un local; las usa la evaluacion de demanda.</summary>
+    Task<List<DemandRule>> FindActiveBySiteIdAsync(Guid siteId, CancellationToken ct = default);
+    Task<List<DemandRule>> FindByUserIdAsync(Guid userId, CancellationToken ct = default);
+}
+
 public interface IInactivityRuleRepository
 {
     Task<InactivityRule> SaveAsync(InactivityRule rule, CancellationToken ct = default);

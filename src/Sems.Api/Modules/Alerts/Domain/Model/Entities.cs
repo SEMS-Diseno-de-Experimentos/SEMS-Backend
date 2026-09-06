@@ -313,3 +313,135 @@ public class NotificationLog
         CreatedAt = DateTime.UtcNow
     };
 }
+
+/// <summary>Que tan cerca esta la demanda de la potencia contratada.</summary>
+public enum DemandLevel
+{
+    /// <summary>Por debajo del aviso. No hay nada que decir.</summary>
+    OK,
+
+    /// <summary>Se acerca a lo contratado. Aun se puede evitar el recargo.</summary>
+    WARNING,
+
+    /// <summary>Ya lo supero. El recargo del mes esta hecho.</summary>
+    EXCEEDED
+}
+
+/// <summary>
+/// Regla que vigila la demanda de un local contra su potencia contratada.
+/// </summary>
+/// <remarks>
+/// <para>Es la alerta que no tenia sentido en el segmento residencial: una
+/// vivienda no paga por potencia, asi que su pico de demanda no le cuesta
+/// dinero. Un local si, y ademas de una forma cruel: el pico mas alto del mes
+/// fija el cargo de los treinta dias, aunque haya durado quince minutos.</para>
+///
+/// <para>Por eso el aviso llega <b>antes</b> de superar lo contratado y no
+/// despues: una vez superado, el recargo del mes ya esta hecho y avisar solo
+/// sirve para dar la mala noticia. Con margen, en cambio, todavia se puede
+/// apagar algo o retrasar el arranque de un equipo.</para>
+/// </remarks>
+public class DemandRule
+{
+    public Guid DemandRuleId { get; private set; }
+
+    public Guid SiteId { get; private set; }
+
+    public Guid UserId { get; private set; }
+
+    public string? RuleName { get; private set; }
+
+    /// <summary>Potencia contratada del local, en kW.</summary>
+    public double ContractedPowerKw { get; private set; }
+
+    /// <summary>Porcentaje de lo contratado a partir del cual se avisa.</summary>
+    public double WarningPercent { get; private set; }
+
+    public bool Active { get; private set; }
+
+    public DateTime CreatedAt { get; private set; }
+
+    public DateTime UpdatedAt { get; private set; }
+
+    private DemandRule()
+    {
+    }
+
+    public static DemandRule Create(Guid siteId, Guid userId, string? ruleName,
+        double contractedPowerKw, double? warningPercent, bool? active)
+    {
+        if (siteId == Guid.Empty)
+        {
+            throw AppException.Validation("site_id is required");
+        }
+        if (contractedPowerKw <= 0)
+        {
+            throw AppException.Validation("contracted_power_kw must be greater than zero");
+        }
+
+        // Por defecto se avisa al 85%. Deja margen para reaccionar sin generar
+        // avisos constantes en un local que normalmente trabaja al 70-80%.
+        var aviso = warningPercent ?? 85d;
+        if (aviso is <= 0 or > 100)
+        {
+            throw AppException.Validation("warning_percent must be between 1 and 100");
+        }
+
+        var now = DateTime.UtcNow;
+        return new DemandRule
+        {
+            DemandRuleId = Guid.NewGuid(),
+            SiteId = siteId,
+            UserId = userId,
+            RuleName = ruleName,
+            ContractedPowerKw = contractedPowerKw,
+            WarningPercent = aviso,
+            Active = active ?? true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    /// <summary>Demanda a la que se dispara el aviso, en kW.</summary>
+    public double UmbralDeAvisoKw => ContractedPowerKw * WarningPercent / 100d;
+
+    /// <summary>En que nivel cae una demanda medida.</summary>
+    public DemandLevel Evaluar(double demandaKw)
+    {
+        if (!Active)
+        {
+            return DemandLevel.OK;
+        }
+        if (demandaKw > ContractedPowerKw)
+        {
+            return DemandLevel.EXCEEDED;
+        }
+        return demandaKw >= UmbralDeAvisoKw ? DemandLevel.WARNING : DemandLevel.OK;
+    }
+
+    /// <summary>Cuantos kW quedan hasta superar lo contratado. Negativo si ya se supero.</summary>
+    public double MargenKw(double demandaKw) => ContractedPowerKw - demandaKw;
+
+    public void UpdateDetails(string? ruleName, double contractedPowerKw, double warningPercent)
+    {
+        if (contractedPowerKw <= 0)
+        {
+            throw AppException.Validation("contracted_power_kw must be greater than zero");
+        }
+        if (warningPercent is <= 0 or > 100)
+        {
+            throw AppException.Validation("warning_percent must be between 1 and 100");
+        }
+
+        RuleName = ruleName;
+        ContractedPowerKw = contractedPowerKw;
+        WarningPercent = warningPercent;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void Deactivate()
+    {
+        Active = false;
+        UpdatedAt = DateTime.UtcNow;
+    }
+}

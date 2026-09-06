@@ -125,6 +125,18 @@ public sealed class EnergyPricingController : ControllerBase
     [HttpGet("pricing/current")]
     public PricingResponse CurrentPricing() => PricingResponse.From(_commands.CurrentPrice());
 
+    /// <summary>Tarifa comercial vigente para una categoria del pliego.</summary>
+    [HttpGet("tariffs/{tariffCategory}")]
+    public TariffResponse CurrentTariff(string tariffCategory) =>
+        TariffResponse.From(_commands.CurrentTariff(tariffCategory));
+
+    /// <summary>Estima la factura del mes de un local.</summary>
+    [HttpPost("bill-estimate")]
+    public BillEstimateResponse EstimateBill([FromBody] EstimateBillRequest request) =>
+        BillEstimateResponse.From(_commands.EstimateBill(request.TariffCategory,
+            request.KwhPeak, request.KwhOffPeak, request.MaxDemandKw,
+            request.ContractedPowerKw));
+
     /// <summary>Consumo actual de un dispositivo.</summary>
     [HttpGet("devices/{deviceId}/consumption/current")]
     public async Task<ReadingResponse> CurrentConsumption(string deviceId) =>

@@ -23,6 +23,27 @@ public class BillPrediction
     public string Currency { get; private set; } = "PEN";
     public double TariffUsed { get; private set; }
     public double ErrorMarginPercentage { get; private set; }
+
+    // --- desglose comercial ---
+    //
+    // La prediccion del segmento anterior era un numero: kWh por precio. Para un
+    // local eso se queda corto, porque una parte grande de la factura no depende
+    // de la energia sino del pico de demanda. Guardar el desglose es lo que
+    // permite ensenar de donde sale el importe y sobre que se puede actuar.
+
+    /// <summary>Local al que corresponde la prediccion. Vacio en las heredadas.</summary>
+    public string? SiteId { get; private set; }
+
+    public double EstimatedKwhPeak { get; private set; }
+
+    public double EstimatedKwhOffPeak { get; private set; }
+
+    /// <summary>Demanda maxima prevista, en kW. Es la que fija el cargo por potencia.</summary>
+    public double EstimatedMaxDemandKw { get; private set; }
+
+    public double EnergyCost { get; private set; }
+
+    public double PowerCost { get; private set; }
     public DateTime GeneratedAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
@@ -32,13 +53,20 @@ public class BillPrediction
 
     public static BillPrediction Create(string userId, int year, int month, DateTime periodStart,
         DateTime periodEnd, double estimatedKwh, double estimatedAmount, string? currency,
-        double tariffUsed, double errorMargin)
+        double tariffUsed, double errorMargin, string? siteId = null, double kwhPeak = 0,
+        double kwhOffPeak = 0, double maxDemandKw = 0, double energyCost = 0, double powerCost = 0)
     {
         var now = DateTime.UtcNow;
         return new BillPrediction
         {
             Id = Guid.NewGuid(),
             UserId = userId,
+            SiteId = siteId,
+            EstimatedKwhPeak = kwhPeak,
+            EstimatedKwhOffPeak = kwhOffPeak,
+            EstimatedMaxDemandKw = maxDemandKw,
+            EnergyCost = energyCost,
+            PowerCost = powerCost,
             PredictionYear = year,
             PredictionMonth = month,
             PeriodStart = periodStart,

@@ -140,4 +140,59 @@ public static class EnergyResources
         public static PricingResponse From(EnergyPrice p) =>
             new(p.Provider, p.PricePerKwh, p.Currency, p.Timestamp);
     }
+
+    /// <summary>Tarifa comercial: precios por franja y cargos por potencia.</summary>
+    public sealed record TariffResponse(
+        [property: JsonPropertyName("provider")] string Provider,
+        [property: JsonPropertyName("tariff_category")] string TariffCategory,
+        [property: JsonPropertyName("currency")] string Currency,
+        [property: JsonPropertyName("energy_peak_per_kwh")] decimal EnergyPeakPerKwh,
+        [property: JsonPropertyName("energy_off_peak_per_kwh")] decimal EnergyOffPeakPerKwh,
+        [property: JsonPropertyName("power_per_kw_month")] decimal PowerPerKwMonth,
+        [property: JsonPropertyName("excess_power_per_kw_month")] decimal ExcessPowerPerKwMonth,
+        [property: JsonPropertyName("fixed_charge")] decimal FixedCharge,
+        [property: JsonPropertyName("igv")] decimal Igv,
+        [property: JsonPropertyName("peak_hours")] string PeakHours,
+        [property: JsonPropertyName("in_peak_now")] bool InPeakNow,
+        [property: JsonPropertyName("timestamp")] DateTime Timestamp)
+    {
+        public static TariffResponse From(CommercialTariff t) => new(
+            t.Provider, t.TariffCategory, t.Currency, t.EnergiaPuntaPorKwh,
+            t.EnergiaFueraDePuntaPorKwh, t.PotenciaPorKwMes, t.ExcesoDePotenciaPorKwMes,
+            t.CargoFijoMensual, t.Igv,
+            $"{HorarioPunta.HoraInicio:00}:00-{HorarioPunta.HoraFin:00}:00 lun-sab",
+            HorarioPunta.EsHoraPunta(DateTime.UtcNow), t.Timestamp);
+    }
+
+    public sealed record EstimateBillRequest(
+        [property: JsonPropertyName("tariff_category")]
+        [Required(ErrorMessage = "is required")] string TariffCategory,
+        [property: JsonPropertyName("contracted_power_kw")]
+        [Required(ErrorMessage = "is required")] decimal ContractedPowerKw,
+        [property: JsonPropertyName("kwh_peak")] decimal KwhPeak,
+        [property: JsonPropertyName("kwh_off_peak")] decimal KwhOffPeak,
+        [property: JsonPropertyName("max_demand_kw")] decimal MaxDemandKw);
+
+    /// <summary>Desglose de la factura estimada de un local.</summary>
+    public sealed record BillEstimateResponse(
+        [property: JsonPropertyName("kwh_peak")] decimal KwhPeak,
+        [property: JsonPropertyName("kwh_off_peak")] decimal KwhOffPeak,
+        [property: JsonPropertyName("max_demand_kw")] decimal MaxDemandKw,
+        [property: JsonPropertyName("contracted_power_kw")] decimal ContractedPowerKw,
+        [property: JsonPropertyName("excess_power_kw")] decimal ExcessPowerKw,
+        [property: JsonPropertyName("has_power_excess")] bool HasPowerExcess,
+        [property: JsonPropertyName("energy_cost")] decimal EnergyCost,
+        [property: JsonPropertyName("power_cost")] decimal PowerCost,
+        [property: JsonPropertyName("power_share_pct")] decimal PowerSharePct,
+        [property: JsonPropertyName("fixed_charge")] decimal FixedCharge,
+        [property: JsonPropertyName("subtotal")] decimal Subtotal,
+        [property: JsonPropertyName("igv")] decimal Igv,
+        [property: JsonPropertyName("total")] decimal Total,
+        [property: JsonPropertyName("currency")] string Currency)
+    {
+        public static BillEstimateResponse From(BillBreakdown b) => new(
+            b.KwhPunta, b.KwhFueraDePunta, b.DemandaMaximaKw, b.PotenciaContratadaKw,
+            b.ExcesoDePotenciaKw, b.HayExcesoDePotencia, b.CostoEnergia, b.CostoPotencia,
+            b.PesoDeLaPotencia, b.CargoFijo, b.Subtotal, b.Igv, b.Total, b.Currency);
+    }
 }

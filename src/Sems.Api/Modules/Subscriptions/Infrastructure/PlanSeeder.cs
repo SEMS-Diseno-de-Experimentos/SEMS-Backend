@@ -34,28 +34,45 @@ public sealed class PlanSeeder
         }
         _logger.LogInformation("No hay planes registrados; cargando los tres por defecto");
 
-        var free = SubscriptionPlan.Create("Free", "Start monitoring at no cost", 0, "PEN", "monthly");
-        free.AddFeature("BASIC_DASHBOARD", "Basic energy dashboard", "enabled");
-        free.AddFeature("CONSUMPTION_ALERTS", "Essential consumption alerts", "enabled");
-        free.AddFeature("LINKED_DEVICES_LIMIT", "Linked devices limit", "3");
-        AddStripePrice(free, "Stripe:Price:Free", "STRIPE_PRICE_FREE");
-        await _plans.SaveAsync(free, ct);
+        // Los planes se miden en LOCALES, no en dispositivos.
+        //
+        // En el segmento anterior el limite de dispositivos tenia sentido: una
+        // vivienda tiene unos pocos. Un supermercado tiene decenas de medidores
+        // en un solo local, asi que un tope de tres o diez no separa a un
+        // cliente pequeno de una cadena; solo estorba. Lo que de verdad escala
+        // con el tamano del cliente es cuantos locales gestiona.
+        var basico = SubscriptionPlan.Create("Basico",
+            "Un local, con lo necesario para empezar a medir", 0, "PEN", "monthly");
+        basico.AddFeature("BASIC_DASHBOARD", "Panel de consumo del local", "enabled");
+        basico.AddFeature("CONSUMPTION_ALERTS", "Alertas de consumo", "enabled");
+        basico.AddFeature("SITES_LIMIT", "Locales incluidos", "1");
+        basico.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "10");
+        AddStripePrice(basico, "Stripe:Price:Free", "STRIPE_PRICE_FREE");
+        await _plans.SaveAsync(basico, ct);
 
-        var plus = SubscriptionPlan.Create("Plus", "For active homes", 15, "PEN", "monthly");
-        plus.AddFeature("FREE_INCLUDED", "Everything in Free", "enabled");
-        plus.AddFeature("DEVICE_ANALYTICS", "Detailed device analytics", "enabled");
-        plus.AddFeature("SAVING_RECOMMENDATIONS", "Personalized saving recommendations", "enabled");
-        plus.AddFeature("MONTHLY_REPORTS", "Monthly savings reports", "enabled");
-        plus.AddFeature("LINKED_DEVICES_LIMIT", "Linked devices limit", "10");
-        AddStripePrice(plus, "Stripe:Price:Plus", "STRIPE_PRICE_PLUS");
-        await _plans.SaveAsync(plus, ct);
+        var negocio = SubscriptionPlan.Create("Negocio",
+            "Para cadenas pequenas, con control de demanda", 149, "PEN", "monthly");
+        negocio.AddFeature("BASIC_INCLUDED", "Todo lo del plan Basico", "enabled");
+        negocio.AddFeature("SITES_LIMIT", "Locales incluidos", "5");
+        negocio.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "50");
+        negocio.AddFeature("ZONE_ANALYTICS", "Consumo desglosado por zona", "enabled");
+        // El aviso de demanda es lo que justifica el salto de plan: evitar un
+        // solo pico al mes ya paga la diferencia con el plan Basico.
+        negocio.AddFeature("DEMAND_ALERTS", "Aviso de demanda antes de superar lo contratado", "enabled");
+        negocio.AddFeature("PEAK_HOUR_REPORTS", "Reportes de consumo en hora punta", "enabled");
+        AddStripePrice(negocio, "Stripe:Price:Plus", "STRIPE_PRICE_PLUS");
+        await _plans.SaveAsync(negocio, ct);
 
-        var pro = SubscriptionPlan.Create("Pro", "Advanced control and insights", 25, "PEN", "monthly");
-        pro.AddFeature("PLUS_INCLUDED", "Everything in Plus", "enabled");
-        pro.AddFeature("UNLIMITED_DEVICES", "Unlimited linked devices", "enabled");
-        pro.AddFeature("PRIORITY_SUPPORT", "Priority support", "enabled");
-        AddStripePrice(pro, "Stripe:Price:Pro", "STRIPE_PRICE_PRO");
-        await _plans.SaveAsync(pro, ct);
+        var corporativo = SubscriptionPlan.Create("Corporativo",
+            "Cadenas grandes, con comparacion entre locales", 399, "PEN", "monthly");
+        corporativo.AddFeature("BUSINESS_INCLUDED", "Todo lo del plan Negocio", "enabled");
+        corporativo.AddFeature("SITES_LIMIT", "Locales incluidos", "unlimited");
+        corporativo.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "unlimited");
+        corporativo.AddFeature("SITE_BENCHMARKING", "Comparacion de rendimiento entre locales", "enabled");
+        corporativo.AddFeature("TARIFF_OPTIMIZATION", "Analisis de categoria tarifaria", "enabled");
+        corporativo.AddFeature("PRIORITY_SUPPORT", "Soporte prioritario", "enabled");
+        AddStripePrice(corporativo, "Stripe:Price:Pro", "STRIPE_PRICE_PRO");
+        await _plans.SaveAsync(corporativo, ct);
     }
 
     private void AddStripePrice(SubscriptionPlan plan, string configKey, string envKey)

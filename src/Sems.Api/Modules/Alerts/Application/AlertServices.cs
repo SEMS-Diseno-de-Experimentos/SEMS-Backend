@@ -11,18 +11,81 @@ public sealed class AlertCommandService
     private readonly IAlertRepository _alerts;
     private readonly IThresholdRepository _thresholds;
     private readonly IInactivityRuleRepository _rules;
+    private readonly IDemandRuleRepository _demandRules;
     private readonly INotificationPreferenceRepository _preferences;
     private readonly IDomainEventBus _bus;
 
     public AlertCommandService(IAlertRepository alerts, IThresholdRepository thresholds,
-        IInactivityRuleRepository rules, INotificationPreferenceRepository preferences,
-        IDomainEventBus bus)
+        IInactivityRuleRepository rules, IDemandRuleRepository demandRules,
+        INotificationPreferenceRepository preferences, IDomainEventBus bus)
     {
         _alerts = alerts;
         _thresholds = thresholds;
         _rules = rules;
+        _demandRules = demandRules;
         _preferences = preferences;
         _bus = bus;
+    }
+
+    // ------------------------------------------------------ reglas de demanda
+
+    public async Task<DemandRule> CreateDemandRuleAsync(Guid siteId, Guid userId, string? ruleName,
+        double contractedPowerKw, double? warningPercent, bool? active,
+        CancellationToken ct = default)
+    {
+        var regla = DemandRule.Create(siteId, userId, ruleName, contractedPowerKw, warningPercent,
+            active);
+        return await _demandRules.SaveAsync(regla, ct);
+    }
+
+    public Task<List<DemandRule>> DemandRulesBySiteAsync(Guid siteId, CancellationToken ct = default) =>
+        _demandRules.FindActiveBySiteIdAsync(siteId, ct);
+
+    /// <summary>
+    /// Evalua una demanda medida contra las reglas del local y levanta la alerta
+    /// que corresponda.
+    /// </summary>
+    /// <remarks>
+    /// <para>Se levanta una alerta por regla incumplida, no una por local: un
+    /// local puede tener una regla estricta para el turno de noche y otra mas
+    /// laxa para el dia.</para>
+    ///
+    /// <para>La severidad distingue los dos casos porque la accion del cliente
+    /// es distinta: con WARNING todavia puede apagar algo y evitar el recargo;
+    /// con EXCEEDED el cargo del mes ya esta hecho y lo unico util es que no se
+    /// repita.</para>
+    /// </remarks>
+    public async Task<List<Alert>> EvaluateDemandAsync(Guid siteId, double demandaKw,
+        CancellationToken ct = default)
+    {
+        var levantadas = new List<Alert>();
+
+        foreach (var regla in await _demandRules.FindActiveBySiteIdAsync(siteId, ct))
+        {
+            var nivel = regla.Evaluar(demandaKw);
+            if (nivel == DemandLevel.OK)
+            {
+                continue;
+            }
+
+            var margen = regla.MargenKw(demandaKw);
+            var (titulo, mensaje, severidad) = nivel == DemandLevel.WARNING
+                ? ("Demanda cerca de lo contratado",
+                   $"El local esta en {demandaKw:0.##} kW de {regla.ContractedPowerKw:0.##} kW contratados. "
+                   + $"Quedan {margen:0.##} kW de margen.",
+                   "WARNING")
+                : ("Demanda por encima de lo contratado",
+                   $"El local alcanzo {demandaKw:0.##} kW, {Math.Abs(margen):0.##} kW por encima de los "
+                   + $"{regla.ContractedPowerKw:0.##} kW contratados. El recargo por exceso se aplica a "
+                   + "todo el mes.",
+                   "CRITICAL");
+
+            var alerta = Alert.Raise(regla.UserId, null, null, null, "DEMAND", titulo, mensaje,
+                severidad, null, DateTime.UtcNow);
+            levantadas.Add(await _alerts.SaveAsync(alerta, ct));
+        }
+
+        return levantadas;
     }
 
     public async Task<Alert> CreateAlertAsync(Guid userId, Guid? deviceId, Guid? thresholdId,

@@ -30,7 +30,8 @@ public sealed class DeviceController : ControllerBase
     public async Task<ActionResult<DeviceResource>> Create([FromBody] CreateDeviceRequest request)
     {
         var device = await _commands.RegisterAsync(request.ExternalDeviceCode,
-            Guid.Parse(request.UserId), request.DeviceName, request.DeviceType,
+            Guid.Parse(request.UserId), Guid.Parse(request.SiteId), ParseOptionalId(request.ZoneId),
+            request.DeviceName, request.DeviceType,
             request.Brand, request.Model, request.ConnectionProtocol);
         return StatusCode(StatusCodes.Status201Created, DeviceResource.From(device));
     }
@@ -50,11 +51,26 @@ public sealed class DeviceController : ControllerBase
     public async Task<List<DeviceResource>> ByUser(Guid userId) =>
         (await _queries.DevicesByUserAsync(userId)).Select(DeviceResource.From).ToList();
 
+    /// <summary>Dispositivos instalados en un local.</summary>
+    [HttpGet("sites/{siteId:guid}/devices")]
+    public async Task<List<DeviceResource>> BySite(Guid siteId) =>
+        (await _queries.DevicesBySiteAsync(siteId)).Select(DeviceResource.From).ToList();
+
+    /// <summary>Dispositivos de una zona concreta.</summary>
+    [HttpGet("zones/{zoneId:guid}/devices")]
+    public async Task<List<DeviceResource>> ByZone(Guid zoneId) =>
+        (await _queries.DevicesByZoneAsync(zoneId)).Select(DeviceResource.From).ToList();
+
     /// <summary>Actualiza los datos editables de un dispositivo.</summary>
     [HttpPut("devices/{deviceId:guid}")]
     public async Task<DeviceResource> Update(Guid deviceId, [FromBody] UpdateDeviceRequest request) =>
         DeviceResource.From(await _commands.UpdateAsync(deviceId, request.DeviceName,
-            request.DeviceType, request.Brand, request.Model, request.ConnectionProtocol));
+            request.DeviceType, request.Brand, request.Model, request.ConnectionProtocol,
+            ParseOptionalId(request.ZoneId)));
+
+    /// <summary>Convierte un identificador opcional del cuerpo en Guid.</summary>
+    private static Guid? ParseOptionalId(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : Guid.Parse(value);
 
     /// <summary>Cambia el estado de un dispositivo.</summary>
     [HttpPatch("devices/{deviceId:guid}/status")]
@@ -71,7 +87,7 @@ public sealed class DeviceController : ControllerBase
     }
 }
 
-/// <summary>Vinculacion de dispositivos con usuarios y hogares.</summary>
+/// <summary>Vinculacion de dispositivos con las personas que los operan.</summary>
 [ApiController]
 [Route("api/v1/device-management")]
 [Tags("Device Bindings")]
@@ -91,10 +107,10 @@ public sealed class DeviceBindingController : ControllerBase
     public async Task<ActionResult<DeviceBindingResource>> Bind(Guid deviceId,
         [FromBody] CreateBindingRequest request)
     {
-        Guid? homeId = string.IsNullOrWhiteSpace(request.HomeId)
-            ? null : Guid.Parse(request.HomeId);
+        Guid? siteId = string.IsNullOrWhiteSpace(request.SiteId)
+            ? null : Guid.Parse(request.SiteId);
 
-        var binding = await _commands.BindAsync(deviceId, Guid.Parse(request.UserId), homeId);
+        var binding = await _commands.BindAsync(deviceId, Guid.Parse(request.UserId), siteId);
         return StatusCode(StatusCodes.Status201Created, DeviceBindingResource.From(binding));
     }
 

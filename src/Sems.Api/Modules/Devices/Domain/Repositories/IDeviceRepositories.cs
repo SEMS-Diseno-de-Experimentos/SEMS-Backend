@@ -19,6 +19,15 @@ public interface IDeviceRepository
 
     Task<List<Device>> FindByUserIdAsync(Guid userId, CancellationToken ct = default);
 
+    /// <summary>Dispositivos vigentes instalados en un local.</summary>
+    Task<List<Device>> FindBySiteIdAsync(Guid siteId, CancellationToken ct = default);
+
+    /// <summary>Dispositivos vigentes de una zona concreta.</summary>
+    Task<List<Device>> FindByZoneIdAsync(Guid zoneId, CancellationToken ct = default);
+
+    /// <summary>Cuantos dispositivos vigentes tiene el local. Lo usan los limites de plan.</summary>
+    Task<int> CountBySiteIdAsync(Guid siteId, CancellationToken ct = default);
+
     Task<bool> ExistsByExternalCodeAsync(string externalDeviceCode, CancellationToken ct = default);
 }
 

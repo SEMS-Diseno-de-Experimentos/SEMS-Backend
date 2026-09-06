@@ -39,6 +39,20 @@ public sealed class AnalyticsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, BillPredictionResponse.From(created));
     }
 
+    /// <summary>
+    /// Calcula la proyeccion de recibo de un local con la tarifa comercial,
+    /// incluido el cargo por potencia.
+    /// </summary>
+    [HttpPost("bill-predictions/forecast")]
+    public async Task<ActionResult<BillPredictionResponse>> ForecastSiteBill(
+        [FromBody] ForecastSiteBillRequest r)
+    {
+        var created = await _service.ForecastSiteBillAsync(r.UserId, r.SiteId, r.TariffCategory,
+            r.ContractedPowerKw, r.PredictionYear, r.PredictionMonth, r.PeriodStart, r.PeriodEnd,
+            r.KwhPeak, r.KwhOffPeak, r.MaxDemandKw, r.ErrorMarginPercentage);
+        return StatusCode(StatusCodes.Status201Created, BillPredictionResponse.From(created));
+    }
+
     // ------------------------------------------------------ recommendations
 
     /// <summary>Recomendaciones de ahorro de un usuario.</summary>

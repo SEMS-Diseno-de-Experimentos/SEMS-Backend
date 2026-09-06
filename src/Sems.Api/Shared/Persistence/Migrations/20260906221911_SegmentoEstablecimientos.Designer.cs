@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Sems.Api.Shared.Persistence;
@@ -11,9 +12,11 @@ using Sems.Api.Shared.Persistence;
 namespace Sems.Api.Shared.Persistence.Migrations
 {
     [DbContext(typeof(SemsDbContext))]
-    partial class SemsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260906221911_SegmentoEstablecimientos")]
+    partial class SegmentoEstablecimientos
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -119,46 +122,6 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("al_thresholds", (string)null);
-                });
-
-            modelBuilder.Entity("Sems.Api.Modules.Alerts.Domain.Model.DemandRule", b =>
-                {
-                    b.Property<Guid>("DemandRuleId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("Active")
-                        .HasColumnType("boolean");
-
-                    b.Property<double>("ContractedPowerKw")
-                        .HasColumnType("double precision");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RuleName")
-                        .HasMaxLength(160)
-                        .HasColumnType("character varying(160)");
-
-                    b.Property<Guid>("SiteId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<double>("WarningPercent")
-                        .HasColumnType("double precision");
-
-                    b.HasKey("DemandRuleId");
-
-                    b.HasIndex("SiteId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("al_demand_rules", (string)null);
                 });
 
             modelBuilder.Entity("Sems.Api.Modules.Alerts.Domain.Model.InactivityRule", b =>
@@ -344,9 +307,6 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
-                    b.Property<double>("EnergyCost")
-                        .HasColumnType("double precision");
-
                     b.Property<double>("ErrorMarginPercentage")
                         .HasColumnType("double precision");
 
@@ -354,15 +314,6 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasColumnType("double precision");
 
                     b.Property<double>("EstimatedKwh")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("EstimatedKwhOffPeak")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("EstimatedKwhPeak")
-                        .HasColumnType("double precision");
-
-                    b.Property<double>("EstimatedMaxDemandKw")
                         .HasColumnType("double precision");
 
                     b.Property<DateTime>("GeneratedAt")
@@ -374,17 +325,11 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<DateTime>("PeriodStart")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<double>("PowerCost")
-                        .HasColumnType("double precision");
-
                     b.Property<int>("PredictionMonth")
                         .HasColumnType("integer");
 
                     b.Property<int>("PredictionYear")
                         .HasColumnType("integer");
-
-                    b.Property<string>("SiteId")
-                        .HasColumnType("text");
 
                     b.Property<double>("TariffUsed")
                         .HasColumnType("double precision");
@@ -574,9 +519,6 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("SiteId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -588,19 +530,12 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ZoneId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("DeviceId");
 
                     b.HasIndex("ExternalDeviceCode")
                         .IsUnique();
 
-                    b.HasIndex("SiteId");
-
                     b.HasIndex("UserId");
-
-                    b.HasIndex("ZoneId");
 
                     b.ToTable("dm_devices", (string)null);
                 });
@@ -619,11 +554,11 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<Guid>("DeviceId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("HomeId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("LinkedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("SiteId")
-                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("UnlinkedAt")
                         .HasColumnType("timestamp with time zone");
