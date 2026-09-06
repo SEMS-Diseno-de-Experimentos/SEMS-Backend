@@ -91,8 +91,19 @@ public sealed class DeviceRepository : IDeviceRepository
     public Task<List<Device>> FindAllAsync(CancellationToken ct = default) =>
         _db.Set<Device>().OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
 
+    /// <summary>Dispositivos vigentes del usuario. Los borrados no salen.</summary>
+    /// <remarks>
+    /// El borrado es logico: marca el dispositivo como REMOVED y conserva la
+    /// fila, porque de ella cuelgan las lecturas y el consumo historico.
+    ///
+    /// Pero conservar la fila no es motivo para seguir ensenandola. Si aparece
+    /// aqui, el usuario borra un dispositivo, desaparece de la pantalla y vuelve
+    /// al recargar; y ademas sigue ocupando cupo, asi que con el plan Free
+    /// (3 dispositivos) basta con dar de alta y borrar tres para quedarse sin
+    /// poder anadir ninguno mas, para siempre.
+    /// </remarks>
     public Task<List<Device>> FindByUserIdAsync(Guid userId, CancellationToken ct = default) =>
-        _db.Set<Device>().Where(d => d.UserId == userId)
+        _db.Set<Device>().Where(d => d.UserId == userId && d.Status != DeviceStatus.REMOVED)
             .OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
 
     public Task<bool> ExistsByExternalCodeAsync(string externalDeviceCode, CancellationToken ct = default) =>
