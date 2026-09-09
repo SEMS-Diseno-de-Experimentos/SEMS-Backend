@@ -24,16 +24,16 @@ public sealed class UserRegisteredHandler : IDomainEventHandler<DomainEvents.Use
     }
 
     public Task HandleAsync(DomainEvents.UserRegistered e, CancellationToken ct = default) =>
-        _notifications.SendEmailAsync(null, e.EmailAddress, "Bienvenido a SEMS",
+        _notifications.SendEmailAsync(null, e.EmailAddress, "Welcome to SEMS",
             $"""
-             Hola:
+             Hello,
 
-             Tu cuenta en SEMS ya esta creada. Desde ahora puedes vincular tu
-             medidor EOS y empezar a ver en que se va tu recibo de luz.
+             Your SEMS account is ready. You can now link your meters and start
+             seeing where your electricity bill actually goes.
 
-             Entra aqui: {_appBaseUrl}
+             Sign in here: {_appBaseUrl}
 
-             El equipo de SEMS
+             The SEMS team
              """, ct);
 }
 
@@ -58,17 +58,17 @@ public sealed class VerificationRequestedHandler
     }
 
     public Task HandleAsync(DomainEvents.VerificationRequested e, CancellationToken ct = default) =>
-        _notifications.SendEmailAsync(null, e.EmailAddress, "Verifica tu cuenta de SEMS",
+        _notifications.SendEmailAsync(null, e.EmailAddress, "Verify your SEMS account",
             $"""
-             Hola:
+             Hello,
 
-             Para activar tu cuenta usa este codigo:
+             Use this code to activate your account:
 
                  {e.Token}
 
-             O entra directamente aqui: {_appBaseUrl}/verify?token={e.Token}
+             Or open this link directly: {_appBaseUrl}/verify?token={e.Token}
 
-             Si no fuiste tu, ignora este mensaje.
+             If this wasn't you, please ignore this message.
              """, ct);
 }
 
@@ -86,16 +86,16 @@ public sealed class PasswordResetRequestedHandler
     }
 
     public Task HandleAsync(DomainEvents.PasswordResetRequested e, CancellationToken ct = default) =>
-        _notifications.SendEmailAsync(null, e.EmailAddress, "Recupera tu contrasena de SEMS",
+        _notifications.SendEmailAsync(null, e.EmailAddress, "Reset your SEMS password",
             $"""
-             Hola:
+             Hello,
 
-             Recibimos una solicitud para cambiar tu contrasena. Usa este enlace:
+             We received a request to change your password. Use this link:
 
                  {_appBaseUrl}/reset-password?token={e.Token}
 
-             El enlace caduca en una hora. Si no fuiste tu, ignora este mensaje
-             y tu contrasena seguira igual.
+             The link expires in one hour. If this wasn't you, ignore this
+             message and your password will stay the same.
              """, ct);
 }
 
@@ -125,19 +125,19 @@ public sealed class PaymentProcessedHandler : IDomainEventHandler<DomainEvents.P
             return;
         }
 
-        await _notifications.SendEmailAsync(null, email, "Comprobante de pago SEMS",
+        await _notifications.SendEmailAsync(null, email, "SEMS payment receipt",
             $"""
-             Hola:
+             Hello,
 
-             Registramos tu pago correctamente.
+             Your payment was recorded successfully.
 
-                 Importe:      {e.Amount} {e.Currency.ToUpperInvariant()}
-                 Referencia:   {e.PaymentId}
-                 Estado:       {e.Status}
+                 Amount:       {e.Amount} {e.Currency.ToUpperInvariant()}
+                 Reference:    {e.PaymentId}
+                 Status:       {e.Status}
 
-             Puedes ver el detalle en {_appBaseUrl}/subscription
+             You can see the details at {_appBaseUrl}/subscription
 
-             Gracias por usar SEMS.
+             Thank you for using SEMS.
              """, ct);
     }
 }
@@ -168,15 +168,15 @@ public sealed class AlertTriggeredHandler : IDomainEventHandler<DomainEvents.Ale
             return;
         }
 
-        await _notifications.SendEmailAsync(e.AlertId, email, "Alerta de consumo en tu local",
+        await _notifications.SendEmailAsync(e.AlertId, email, "Consumption alert at your site",
             $"""
-             Hola:
+             Hello,
 
              {e.Message}
 
-             Severidad: {e.Severity}
+             Severity: {e.Severity}
 
-             Revisa el detalle en {_appBaseUrl}/alerts
+             See the details at {_appBaseUrl}/alerts
              """, ct);
     }
 }
@@ -217,12 +217,12 @@ public sealed class ReadingProcessedHandler : IDomainEventHandler<DomainEvents.R
                 continue;
             }
 
-            var message = $"El dispositivo supero el umbral '{threshold.ThresholdName}': " +
+            var message = $"Device exceeded threshold '{threshold.ThresholdName}': " +
                           $"{value} {threshold.Operator.Symbol()} {threshold.ThresholdValue} " +
                           $"{threshold.Metric}";
 
             await _alertCommands.CreateAlertAsync(e.UserId, e.DeviceId, threshold.ThresholdId,
-                null, "threshold_exceeded", "Consumo por encima del umbral", message, "high",
+                null, "threshold_exceeded", "Consumption above threshold", message, "high",
                 null, e.RecordedAt, ct);
 
             _logger.LogInformation("Umbral {ThresholdId} roto por el dispositivo {DeviceId}",

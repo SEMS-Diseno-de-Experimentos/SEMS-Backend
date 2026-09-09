@@ -45,6 +45,18 @@ public class Site
 
     public TariffCategory TariffCategory { get; private set; }
 
+    /// <summary>
+    /// Si este suministro tiene concedida la exclusion de domingos y feriados del
+    /// horario de punta.
+    /// </summary>
+    /// <remarks>
+    /// El pliego fija la hora punta de 18:00 a 23:00 <b>todos los dias</b>, y permite
+    /// excluir domingos y feriados solo <i>a solicitud del cliente</i>. No es el caso
+    /// general, asi que por defecto es falso: darlo por concedido subestimaria la
+    /// factura de todos los locales que no lo pidieron.
+    /// </remarks>
+    public bool ExcludesSundaysFromPeak { get; private set; }
+
     public OrgStatus Status { get; private set; }
 
     public DateTime CreatedAt { get; private set; }
@@ -58,7 +70,8 @@ public class Site
 
     public static Site Register(Guid organizationId, string? siteCode, string? name,
         string? address, string? district, decimal? floorAreaM2,
-        decimal contractedPowerKw, TariffCategory tariffCategory)
+        decimal contractedPowerKw, TariffCategory tariffCategory,
+        bool excludesSundaysFromPeak = false)
     {
         if (organizationId == Guid.Empty)
         {
@@ -93,6 +106,7 @@ public class Site
             FloorAreaM2 = floorAreaM2,
             ContractedPowerKw = contractedPowerKw,
             TariffCategory = tariffCategory,
+            ExcludesSundaysFromPeak = excludesSundaysFromPeak,
             Status = OrgStatus.ACTIVE,
             CreatedAt = ahora,
             UpdatedAt = ahora
@@ -100,7 +114,8 @@ public class Site
     }
 
     public void UpdateDetails(string? name, string? address, string? district,
-        decimal? floorAreaM2, decimal contractedPowerKw, TariffCategory tariffCategory)
+        decimal? floorAreaM2, decimal contractedPowerKw, TariffCategory tariffCategory,
+        bool excludesSundaysFromPeak = false)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -121,6 +136,7 @@ public class Site
         FloorAreaM2 = floorAreaM2;
         ContractedPowerKw = contractedPowerKw;
         TariffCategory = tariffCategory;
+        ExcludesSundaysFromPeak = excludesSundaysFromPeak;
         UpdatedAt = DateTime.UtcNow;
     }
 

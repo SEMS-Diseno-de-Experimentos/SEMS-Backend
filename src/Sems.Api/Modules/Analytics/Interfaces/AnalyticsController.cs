@@ -23,12 +23,12 @@ public sealed class AnalyticsController : ControllerBase
 
     // ---------------------------------------------------- bill-predictions
 
-    /// <summary>Proyecciones de recibo de un usuario.</summary>
+    /// <summary>A user's bill forecasts.</summary>
     [HttpGet("bill-predictions/user/{userId}")]
     public async Task<List<BillPredictionResponse>> Predictions(string userId) =>
         (await _service.PredictionsByUserAsync(userId)).Select(BillPredictionResponse.From).ToList();
 
-    /// <summary>Registra una proyeccion de recibo.</summary>
+    /// <summary>Records a bill forecast.</summary>
     [HttpPost("bill-predictions")]
     public async Task<ActionResult<BillPredictionResponse>> CreatePrediction(
         [FromBody] CreatePredictionRequest r)
@@ -40,8 +40,8 @@ public sealed class AnalyticsController : ControllerBase
     }
 
     /// <summary>
-    /// Calcula la proyeccion de recibo de un local con la tarifa comercial,
-    /// incluido el cargo por potencia.
+    /// Forecasts a site's bill using the commercial tariff, including the
+    /// power charge.
     /// </summary>
     [HttpPost("bill-predictions/forecast")]
     public async Task<ActionResult<BillPredictionResponse>> ForecastSiteBill(
@@ -55,12 +55,12 @@ public sealed class AnalyticsController : ControllerBase
 
     // ------------------------------------------------------ recommendations
 
-    /// <summary>Recomendaciones de ahorro de un usuario.</summary>
+    /// <summary>A user's saving recommendations.</summary>
     [HttpGet("recommendations/user/{userId}")]
     public async Task<List<RecommendationResponse>> Recommendations(string userId) =>
         (await _service.RecommendationsByUserAsync(userId)).Select(RecommendationResponse.From).ToList();
 
-    /// <summary>Registra una recomendacion.</summary>
+    /// <summary>Records a recommendation.</summary>
     [HttpPost("recommendations")]
     public async Task<ActionResult<RecommendationResponse>> CreateRecommendation(
         [FromBody] CreateRecommendationRequest r)
@@ -71,19 +71,19 @@ public sealed class AnalyticsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, RecommendationResponse.From(created));
     }
 
-    /// <summary>Marca una recomendacion como aplicada.</summary>
+    /// <summary>Marks a recommendation as applied.</summary>
     [HttpPatch("recommendations/{recommendationId:guid}/apply")]
     public async Task<RecommendationResponse> ApplyRecommendation(Guid recommendationId) =>
         RecommendationResponse.From(await _service.ApplyRecommendationAsync(recommendationId));
 
     // ------------------------------------------------------------ anomalies
 
-    /// <summary>Anomalias detectadas para un usuario.</summary>
+    /// <summary>Anomalies detected for a user.</summary>
     [HttpGet("anomalies/user/{userId}")]
     public async Task<List<AnomalyResponse>> Anomalies(string userId) =>
         (await _service.AnomaliesByUserAsync(userId)).Select(AnomalyResponse.From).ToList();
 
-    /// <summary>Registra una anomalia.</summary>
+    /// <summary>Records an anomaly.</summary>
     [HttpPost("anomalies")]
     public async Task<ActionResult<AnomalyResponse>> CreateAnomaly([FromBody] CreateAnomalyRequest r)
     {
@@ -92,20 +92,20 @@ public sealed class AnalyticsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, AnomalyResponse.From(created));
     }
 
-    /// <summary>Da por resuelta una anomalia.</summary>
+    /// <summary>Marks an anomaly as resolved.</summary>
     [HttpPatch("anomalies/{anomalyId:guid}/resolve")]
     public async Task<AnomalyResponse> ResolveAnomaly(Guid anomalyId) =>
         AnomalyResponse.From(await _service.ResolveAnomalyAsync(anomalyId));
 
     // ------------------------------------------- device-identifications
 
-    /// <summary>Identificaciones de aparatos de un usuario.</summary>
+    /// <summary>Appliance identifications for a user.</summary>
     [HttpGet("device-identifications/user/{userId}")]
     public async Task<List<DeviceIdentificationResponse>> Identifications(string userId) =>
         (await _service.IdentificationsByUserAsync(userId))
         .Select(DeviceIdentificationResponse.From).ToList();
 
-    /// <summary>Registra una identificacion de aparato.</summary>
+    /// <summary>Records an appliance identification.</summary>
     [HttpPost("device-identifications")]
     public async Task<ActionResult<DeviceIdentificationResponse>> CreateIdentification(
         [FromBody] CreateIdentificationRequest r)
@@ -117,12 +117,12 @@ public sealed class AnalyticsController : ControllerBase
 
     // -------------------------------------------- consumption-rankings
 
-    /// <summary>Rankings de consumo de un usuario.</summary>
+    /// <summary>A user's consumption rankings.</summary>
     [HttpGet("consumption-rankings/user/{userId}")]
     public async Task<List<ConsumptionRankingResponse>> Rankings(string userId) =>
         (await _service.RankingsByUserAsync(userId)).Select(ConsumptionRankingResponse.From).ToList();
 
-    /// <summary>Registra un ranking de consumo.</summary>
+    /// <summary>Records a consumption ranking.</summary>
     [HttpPost("consumption-rankings")]
     public async Task<ActionResult<ConsumptionRankingResponse>> CreateRanking(
         [FromBody] CreateRankingRequest r)

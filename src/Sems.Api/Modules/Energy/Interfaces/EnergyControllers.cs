@@ -4,7 +4,7 @@ using static Sems.Api.Modules.Energy.Interfaces.EnergyResources;
 
 namespace Sems.Api.Modules.Energy.Interfaces;
 
-/// <summary>Medidores EOS vinculados a cada usuario.</summary>
+/// <summary>Smart meters linked to each user.</summary>
 [ApiController]
 [Route("api/v1/energy-meters")]
 [Tags("Energy Meters")]
@@ -19,7 +19,7 @@ public sealed class EnergyMeterController : ControllerBase
         _queries = queries;
     }
 
-    /// <summary>Registra un medidor nuevo.</summary>
+    /// <summary>Registers a new meter.</summary>
     [HttpPost]
     public async Task<ActionResult<MeterResponse>> Register([FromBody] RegisterMeterRequest request)
     {
@@ -29,23 +29,23 @@ public sealed class EnergyMeterController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, MeterResponse.From(meter));
     }
 
-    /// <summary>Lista los medidores de un usuario.</summary>
+    /// <summary>Lists a user's meters.</summary>
     [HttpGet("user/{userId}")]
     public async Task<List<MeterResponse>> ByUser(string userId) =>
         (await _queries.MetersByUserAsync(userId)).Select(MeterResponse.From).ToList();
 
-    /// <summary>Desactiva un medidor.</summary>
+    /// <summary>Deactivates a meter.</summary>
     [HttpPatch("{meterId:guid}/deactivate")]
     public async Task<MeterResponse> Deactivate(Guid meterId) =>
         MeterResponse.From(await _commands.DeactivateMeterAsync(meterId));
 
-    /// <summary>Obtiene un medidor por su identificador.</summary>
+    /// <summary>Gets a meter by its identifier.</summary>
     [HttpGet("{meterId:guid}")]
     public async Task<MeterResponse> ById(Guid meterId) =>
         MeterResponse.From(await _queries.MeterByIdAsync(meterId));
 }
 
-/// <summary>Lecturas individuales enviadas por los medidores.</summary>
+/// <summary>Individual readings sent by the meters.</summary>
 [ApiController]
 [Route("api/v1/energy-readings")]
 [Tags("Energy Readings")]
@@ -60,7 +60,7 @@ public sealed class EnergyReadingController : ControllerBase
         _queries = queries;
     }
 
-    /// <summary>Registra una lectura nueva.</summary>
+    /// <summary>Records a new reading.</summary>
     [HttpPost]
     public async Task<ActionResult<ReadingResponse>> Create([FromBody] CreateReadingRequest request)
     {
@@ -71,31 +71,31 @@ public sealed class EnergyReadingController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, ReadingResponse.From(reading));
     }
 
-    /// <summary>Lecturas de un usuario, de la mas reciente a la mas antigua.</summary>
+    /// <summary>A user's readings, newest first.</summary>
     [HttpGet("user/{userId}")]
     public async Task<List<ReadingResponse>> ByUser(string userId,
         [FromQuery] int limit = 100) =>
         (await _queries.ReadingsByUserAsync(userId, limit)).Select(ReadingResponse.From).ToList();
 
-    /// <summary>Lecturas de un dispositivo.</summary>
+    /// <summary>Readings from a device.</summary>
     [HttpGet("device/{deviceId}")]
     public async Task<List<ReadingResponse>> ByDevice(string deviceId,
         [FromQuery] int limit = 50, [FromQuery] int skip = 0) =>
         (await _queries.ReadingsByDeviceAsync(deviceId, limit, skip))
         .Select(ReadingResponse.From).ToList();
 
-    /// <summary>Lecturas de un usuario dentro de un rango de fechas.</summary>
+    /// <summary>A user's readings within a date range.</summary>
     [HttpGet("range")]
     public async Task<List<ReadingResponse>> ByRange([FromQuery] string userId,
         [FromQuery] DateTime from, [FromQuery] DateTime to) =>
         (await _queries.ReadingsByRangeAsync(userId, from, to)).Select(ReadingResponse.From).ToList();
 
-    /// <summary>Ultima lectura de un medidor.</summary>
+    /// <summary>Latest reading from a meter.</summary>
     [HttpGet("meter/{meterId}/latest")]
     public async Task<ReadingResponse> LatestByMeter(string meterId) =>
         ReadingResponse.From(await _queries.LatestByMeterAsync(meterId));
 
-    /// <summary>Obtiene una lectura por su identificador.</summary>
+    /// <summary>Gets a reading by its identifier.</summary>
     [HttpGet("{readingId:guid}")]
     public async Task<ReadingResponse> ById(Guid readingId) =>
         ReadingResponse.From(await _queries.ReadingByIdAsync(readingId));
@@ -121,28 +121,28 @@ public sealed class EnergyPricingController : ControllerBase
         _queries = queries;
     }
 
-    /// <summary>Tarifa electrica vigente.</summary>
+    /// <summary>Current electricity tariff.</summary>
     [HttpGet("pricing/current")]
     public PricingResponse CurrentPricing() => PricingResponse.From(_commands.CurrentPrice());
 
-    /// <summary>Tarifa comercial vigente para una categoria del pliego.</summary>
+    /// <summary>Current commercial tariff for a category of the schedule.</summary>
     [HttpGet("tariffs/{tariffCategory}")]
     public TariffResponse CurrentTariff(string tariffCategory) =>
         TariffResponse.From(_commands.CurrentTariff(tariffCategory));
 
-    /// <summary>Estima la factura del mes de un local.</summary>
+    /// <summary>Estimates a site's monthly bill.</summary>
     [HttpPost("bill-estimate")]
     public BillEstimateResponse EstimateBill([FromBody] EstimateBillRequest request) =>
         BillEstimateResponse.From(_commands.EstimateBill(request.TariffCategory,
             request.KwhPeak, request.KwhOffPeak, request.MaxDemandKw,
             request.ContractedPowerKw));
 
-    /// <summary>Consumo actual de un dispositivo.</summary>
+    /// <summary>Current consumption of a device.</summary>
     [HttpGet("devices/{deviceId}/consumption/current")]
     public async Task<ReadingResponse> CurrentConsumption(string deviceId) =>
         ReadingResponse.From(await _queries.LatestByDeviceAsync(deviceId));
 
-    /// <summary>Historial de consumo de un dispositivo.</summary>
+    /// <summary>Consumption history of a device.</summary>
     [HttpGet("devices/{deviceId}/consumption/history")]
     public async Task<List<ReadingResponse>> ConsumptionHistory(string deviceId,
         [FromQuery] int limit = 50, [FromQuery] int skip = 0) =>
@@ -150,7 +150,7 @@ public sealed class EnergyPricingController : ControllerBase
         .Select(ReadingResponse.From).ToList();
 }
 
-/// <summary>Resumenes de consumo agregados por dispositivo y periodo.</summary>
+/// <summary>Consumption summaries aggregated by device and period.</summary>
 [ApiController]
 [Route("api/v1/device-consumptions")]
 [Tags("Device Consumptions")]
@@ -160,25 +160,25 @@ public sealed class DeviceConsumptionController : ControllerBase
 
     public DeviceConsumptionController(EnergyQueryService queries) => _queries = queries;
 
-    /// <summary>Resumenes de consumo de un usuario.</summary>
+    /// <summary>A user's consumption summaries.</summary>
     [HttpGet("user/{userId}")]
     public async Task<List<ConsumptionResponse>> ByUser(string userId) =>
         (await _queries.ConsumptionsByUserAsync(userId)).Select(ConsumptionResponse.From).ToList();
 
-    /// <summary>Dispositivos que mas consumen de un usuario.</summary>
+    /// <summary>A user's highest-consuming devices.</summary>
     [HttpGet("user/{userId}/top")]
     public async Task<List<ConsumptionResponse>> TopByUser(string userId,
         [FromQuery] int limit = 10) =>
         (await _queries.TopConsumersByUserAsync(userId, limit))
         .Select(ConsumptionResponse.From).ToList();
 
-    /// <summary>Obtiene un resumen por su identificador.</summary>
+    /// <summary>Gets a summary by its identifier.</summary>
     [HttpGet("{consumptionId:guid}")]
     public async Task<ConsumptionResponse> ById(Guid consumptionId) =>
         ConsumptionResponse.From(await _queries.ConsumptionByIdAsync(consumptionId));
 }
 
-/// <summary>Alertas generadas por el propio modulo de monitoreo.</summary>
+/// <summary>Alerts raised by the monitoring module itself.</summary>
 [ApiController]
 [Route("api/v1/consumption-alerts")]
 [Tags("Consumption Alerts")]
@@ -193,27 +193,27 @@ public sealed class ConsumptionAlertController : ControllerBase
         _queries = queries;
     }
 
-    /// <summary>Alertas de un usuario.</summary>
+    /// <summary>Alerts for a user.</summary>
     [HttpGet("user/{userId}")]
     public async Task<List<AlertResponse>> ByUser(string userId) =>
         (await _queries.AlertsByUserAsync(userId)).Select(AlertResponse.From).ToList();
 
-    /// <summary>Alertas sin leer de un usuario.</summary>
+    /// <summary>Unread alerts for a user.</summary>
     [HttpGet("user/{userId}/unread")]
     public async Task<List<AlertResponse>> UnreadByUser(string userId) =>
         (await _queries.UnreadAlertsByUserAsync(userId)).Select(AlertResponse.From).ToList();
 
-    /// <summary>Obtiene una alerta por su identificador.</summary>
+    /// <summary>Gets an alert by its identifier.</summary>
     [HttpGet("{alertId:guid}")]
     public async Task<AlertResponse> ById(Guid alertId) =>
         AlertResponse.From(await _queries.AlertByIdAsync(alertId));
 
-    /// <summary>Marca una alerta como leida.</summary>
+    /// <summary>Marks an alert as read.</summary>
     [HttpPatch("{alertId:guid}/read")]
     public async Task<AlertResponse> MarkRead(Guid alertId) =>
         AlertResponse.From(await _commands.MarkAlertReadAsync(alertId));
 
-    /// <summary>Da por resuelta una alerta.</summary>
+    /// <summary>Marks an alert as resolved.</summary>
     [HttpPatch("{alertId:guid}/resolve")]
     public async Task<AlertResponse> Resolve(Guid alertId) =>
         AlertResponse.From(await _commands.ResolveAlertAsync(alertId));

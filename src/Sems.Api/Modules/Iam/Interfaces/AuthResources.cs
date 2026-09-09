@@ -4,8 +4,8 @@ using Sems.Api.Modules.Iam.Application;
 namespace Sems.Api.Modules.Iam.Interfaces;
 
 /// <summary>
-/// Contrato JSON del modulo de identidad, en camelCase como el servicio original
-/// en Spring.
+/// JSON contract of the identity module, in camelCase as in the original
+/// Spring service.
 /// </summary>
 public static class AuthResources
 {

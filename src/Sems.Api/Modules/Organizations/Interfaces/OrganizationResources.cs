@@ -5,7 +5,7 @@ using Sems.Api.Modules.Organizations.Domain.Model;
 namespace Sems.Api.Modules.Organizations.Interfaces;
 
 /// <summary>
-/// Contrato JSON del modulo de organizaciones, en snake_case.
+/// JSON contract of the organizations module, in snake_case.
 /// </summary>
 /// <remarks>
 /// Se elige snake_case por ser el que usan la mayoria de modulos (energia,
@@ -49,7 +49,9 @@ public static class OrganizationResources
         [property: JsonPropertyName("contracted_power_kw")]
         [Required(ErrorMessage = "is required")] decimal ContractedPowerKw,
         [property: JsonPropertyName("tariff_category")]
-        [Required(ErrorMessage = "is required")] string TariffCategory);
+        [Required(ErrorMessage = "is required")] string TariffCategory,
+        // Solo true si la distribuidora concedio la exclusion a solicitud del cliente.
+        [property: JsonPropertyName("excludes_sundays_from_peak")] bool? ExcludesSundaysFromPeak);
 
     public sealed record UpdateSiteRequest(
         [property: JsonPropertyName("name")]
@@ -60,7 +62,8 @@ public static class OrganizationResources
         [property: JsonPropertyName("contracted_power_kw")]
         [Required(ErrorMessage = "is required")] decimal ContractedPowerKw,
         [property: JsonPropertyName("tariff_category")]
-        [Required(ErrorMessage = "is required")] string TariffCategory);
+        [Required(ErrorMessage = "is required")] string TariffCategory,
+        [property: JsonPropertyName("excludes_sundays_from_peak")] bool? ExcludesSundaysFromPeak);
 
     public sealed record CreateZoneRequest(
         [property: JsonPropertyName("name")]
@@ -111,6 +114,7 @@ public static class OrganizationResources
         [property: JsonPropertyName("contracted_power_kw")] decimal ContractedPowerKw,
         [property: JsonPropertyName("tariff_category")] string TariffCategory,
         [property: JsonPropertyName("charges_for_demand")] bool ChargesForDemand,
+        [property: JsonPropertyName("excludes_sundays_from_peak")] bool ExcludesSundaysFromPeak,
         [property: JsonPropertyName("status")] string Status,
         [property: JsonPropertyName("created_at")] DateTime CreatedAt,
         [property: JsonPropertyName("updated_at")] DateTime UpdatedAt)
@@ -118,7 +122,8 @@ public static class OrganizationResources
         public static SiteResource From(Site s) => new(
             s.SiteId.ToString(), s.OrganizationId.ToString(), s.SiteCode, s.Name, s.Address,
             s.District, s.FloorAreaM2, s.ContractedPowerKw, s.TariffCategory.ToString(),
-            s.TariffCategory.CobraPorPotencia(), s.Status.ToString(), s.CreatedAt, s.UpdatedAt);
+            s.TariffCategory.CobraPorPotencia(), s.ExcludesSundaysFromPeak, s.Status.ToString(),
+            s.CreatedAt, s.UpdatedAt);
     }
 
     public sealed record ZoneResource(
@@ -149,7 +154,7 @@ public static class OrganizationResources
             m.Role.ToString(), m.SiteId?.ToString(), m.Status.ToString(), m.CreatedAt);
     }
 
-    /// <summary>Organizacion con el papel que tiene ahi quien pregunta.</summary>
+    /// <summary>Organization together with the role the caller holds in it.</summary>
     public sealed record MyOrganizationResource(
         [property: JsonPropertyName("organization")] OrganizationResource Organization,
         [property: JsonPropertyName("role")] string Role,

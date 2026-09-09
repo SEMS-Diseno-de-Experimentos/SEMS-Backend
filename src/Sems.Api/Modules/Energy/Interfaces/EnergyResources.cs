@@ -141,7 +141,7 @@ public static class EnergyResources
             new(p.Provider, p.PricePerKwh, p.Currency, p.Timestamp);
     }
 
-    /// <summary>Tarifa comercial: precios por franja y cargos por potencia.</summary>
+    /// <summary>Commercial tariff: prices per time band and power charges.</summary>
     public sealed record TariffResponse(
         [property: JsonPropertyName("provider")] string Provider,
         [property: JsonPropertyName("tariff_category")] string TariffCategory,
@@ -173,7 +173,7 @@ public static class EnergyResources
         [property: JsonPropertyName("kwh_off_peak")] decimal KwhOffPeak,
         [property: JsonPropertyName("max_demand_kw")] decimal MaxDemandKw);
 
-    /// <summary>Desglose de la factura estimada de un local.</summary>
+    /// <summary>Breakdown of a site's estimated bill.</summary>
     public sealed record BillEstimateResponse(
         [property: JsonPropertyName("kwh_peak")] decimal KwhPeak,
         [property: JsonPropertyName("kwh_off_peak")] decimal KwhOffPeak,

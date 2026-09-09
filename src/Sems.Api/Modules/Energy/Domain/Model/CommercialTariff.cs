@@ -20,14 +20,21 @@ public enum FranjaHoraria
 /// Reglas del horario de punta del sistema electrico peruano.
 /// </summary>
 /// <remarks>
-/// <para>La hora punta va de 18:00 a 23:00, de lunes a sabado. Los domingos no
-/// tienen punta.</para>
+/// <para>Segun el pliego tarifario (OSINERGMIN, Anexo B): <i>"Se entendera por horas
+/// de punta (HP) el periodo comprendido entre las 18:00 horas y 23:00 horas de cada
+/// dia de todos los meses del ano, exceptuandose a solicitud del cliente, los dias
+/// domingos, dias de descanso que correspondan a feriados y feriados que coincidan
+/// con dias de descanso"</i>.</para>
 ///
-/// <para>Para un supermercado esto no es un detalle contable: coincide con la
-/// hora de mayor afluencia, cuando estan encendidas todas las cajas, la
-/// iluminacion y el aire. Saber cuanto del consumo cae en esa franja es lo que
-/// permite recomendar mover cargas desplazables (bombeo, carga de baterias,
-/// precongelado) a otro horario.</para>
+/// <para>Conviene leer despacio la parte de "a solicitud del cliente": la hora punta
+/// rige <b>todos los dias</b>, domingos incluidos. La exclusion de domingos y feriados
+/// no es automatica, es una opcion que el cliente pide a la distribuidora. Por eso no
+/// se puede codificar como si fuera universal: depende del contrato de cada suministro
+/// y por eso llega como parametro.</para>
+///
+/// <para>Para un supermercado la diferencia no es menor. El domingo es uno de sus dias
+/// de mayor afluencia, y darlo por fuera de punta cuando no lo esta subestima la
+/// factura justo en la franja mas cara.</para>
 /// </remarks>
 public static class HorarioPunta
 {
@@ -35,17 +42,27 @@ public static class HorarioPunta
     public const int HoraFin = 23;
 
     /// <summary>Franja a la que pertenece un instante.</summary>
+    /// <param name="instanteUtc">Momento de la lectura, en UTC.</param>
+    /// <param name="excluyeDomingos">
+    /// Si el suministro tiene concedida la exclusion de domingos y feriados. Por
+    /// defecto <c>false</c>, que es el caso general del pliego.
+    /// </param>
     /// <remarks>
-    /// Se evalua en hora local de Peru, no en UTC. Las lecturas se guardan en
-    /// UTC, y Peru esta en UTC-5: sin convertir, un consumo de las 19:00 locales
-    /// se registraria como las 00:00 del dia siguiente y se facturaria como
-    /// fuera de punta, que es justo lo contrario de lo que es.
+    /// Se evalua en hora local de Peru, no en UTC. Las lecturas se guardan en UTC, y
+    /// Peru esta en UTC-5: sin convertir, un consumo de las 19:00 locales se
+    /// registraria como las 00:00 del dia siguiente y se facturaria como fuera de
+    /// punta, que es justo lo contrario de lo que es.
+    ///
+    /// Los feriados no se contemplan aqui: requieren el calendario oficial del ano, que
+    /// esta fuera del alcance de este modelo. Un suministro con la exclusion concedida
+    /// vera bien sus domingos y mal sus feriados; queda anotado como limitacion
+    /// conocida en vez de resolverse a medias.
     /// </remarks>
-    public static FranjaHoraria FranjaDe(DateTime instanteUtc)
+    public static FranjaHoraria FranjaDe(DateTime instanteUtc, bool excluyeDomingos = false)
     {
         var local = AHoraLocal(instanteUtc);
 
-        if (local.DayOfWeek == DayOfWeek.Sunday)
+        if (excluyeDomingos && local.DayOfWeek == DayOfWeek.Sunday)
         {
             return FranjaHoraria.FUERA_DE_PUNTA;
         }
@@ -55,8 +72,8 @@ public static class HorarioPunta
             : FranjaHoraria.FUERA_DE_PUNTA;
     }
 
-    public static bool EsHoraPunta(DateTime instanteUtc) =>
-        FranjaDe(instanteUtc) == FranjaHoraria.PUNTA;
+    public static bool EsHoraPunta(DateTime instanteUtc, bool excluyeDomingos = false) =>
+        FranjaDe(instanteUtc, excluyeDomingos) == FranjaHoraria.PUNTA;
 
     /// <summary>Pasa un instante UTC a hora de Peru (UTC-5, sin horario de verano).</summary>
     public static DateTime AHoraLocal(DateTime instanteUtc) =>

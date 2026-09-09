@@ -37,6 +37,7 @@ public sealed class SiteConfig : IEntityTypeConfiguration<Site>
         builder.Property(s => s.FloorAreaM2).HasPrecision(12, 2);
         builder.Property(s => s.ContractedPowerKw).HasPrecision(12, 2);
         builder.Property(s => s.TariffCategory).HasConversion<string>().HasMaxLength(10);
+        builder.Property(s => s.ExcludesSundaysFromPeak).HasDefaultValue(false);
         builder.Property(s => s.Status).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(s => s.OrganizationId);
         // El codigo de local se repite entre cadenas distintas (dos empresas

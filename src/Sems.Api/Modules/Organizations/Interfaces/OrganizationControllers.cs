@@ -5,7 +5,7 @@ using static Sems.Api.Modules.Organizations.Interfaces.OrganizationResources;
 
 namespace Sems.Api.Modules.Organizations.Interfaces;
 
-/// <summary>API REST de organizaciones y locales.</summary>
+/// <summary>REST API for organizations and sites.</summary>
 [ApiController]
 [Route("api/v1/organizations")]
 [Tags("Organizations")]
@@ -21,7 +21,7 @@ public sealed class OrganizationController : ControllerBase
         _queries = queries;
     }
 
-    /// <summary>Da de alta una organizacion y deja a quien la crea como administrador.</summary>
+    /// <summary>Registers an organization and makes its creator the administrator.</summary>
     [HttpPost]
     public async Task<ActionResult<OrganizationResource>> Create(
         [FromBody] CreateOrganizationRequest request)
@@ -31,7 +31,7 @@ public sealed class OrganizationController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, OrganizationResource.From(organizacion));
     }
 
-    /// <summary>Organizaciones a las que pertenece una persona, con su papel.</summary>
+    /// <summary>Organizations a person belongs to, with their role.</summary>
     [HttpGet("/api/v1/users/{userId}/organizations")]
     public async Task<List<MyOrganizationResource>> Mine(string userId)
     {
@@ -52,18 +52,19 @@ public sealed class OrganizationController : ControllerBase
 
     // ----------------------------------------------------------------- locales
 
-    /// <summary>Da de alta un local en la organizacion.</summary>
+    /// <summary>Registers a site in the organization.</summary>
     [HttpPost("{organizationId}/sites")]
     public async Task<ActionResult<SiteResource>> CreateSite(string organizationId,
         [FromBody] CreateSiteRequest request)
     {
         var local = await _commands.RegisterSiteAsync(ParseId(organizationId, "organization_id"),
             request.SiteCode, request.Name, request.Address, request.District, request.FloorAreaM2,
-            request.ContractedPowerKw, request.TariffCategory);
+            request.ContractedPowerKw, request.TariffCategory,
+            request.ExcludesSundaysFromPeak ?? false);
         return StatusCode(StatusCodes.Status201Created, SiteResource.From(local));
     }
 
-    /// <summary>Locales vigentes de la organizacion.</summary>
+    /// <summary>Active sites of the organization.</summary>
     [HttpGet("{organizationId}/sites")]
     public async Task<List<SiteResource>> ListSites(string organizationId)
     {
@@ -71,7 +72,7 @@ public sealed class OrganizationController : ControllerBase
         return locales.Select(SiteResource.From).ToList();
     }
 
-    /// <summary>Personas con acceso a la organizacion.</summary>
+    /// <summary>People with access to the organization.</summary>
     [HttpGet("{organizationId}/members")]
     public async Task<List<MembershipResource>> ListMembers(string organizationId)
     {
@@ -79,7 +80,7 @@ public sealed class OrganizationController : ControllerBase
         return vinculos.Select(MembershipResource.From).ToList();
     }
 
-    /// <summary>Da acceso a una persona, o cambia el que ya tenia.</summary>
+    /// <summary>Grants access to a person, or changes their existing access.</summary>
     [HttpPost("{organizationId}/members")]
     public async Task<ActionResult<MembershipResource>> GrantMembership(string organizationId,
         [FromBody] GrantMembershipRequest request)
@@ -100,7 +101,7 @@ public sealed class OrganizationController : ControllerBase
     }
 
     /// <summary>
-    /// Convierte el identificador de la ruta o del cuerpo en Guid.
+    /// Converts the identifier from the route or the body into a Guid.
     /// </summary>
     /// <remarks>
     /// Sin esto, un identificador mal formado provoca una excepcion de formato
@@ -112,7 +113,7 @@ public sealed class OrganizationController : ControllerBase
             : throw AppException.Validation($"{campo} is not a valid identifier");
 }
 
-/// <summary>API REST de locales y sus zonas.</summary>
+/// <summary>REST API for sites and their zones.</summary>
 [ApiController]
 [Route("api/v1/sites")]
 [Tags("Sites")]
@@ -137,7 +138,7 @@ public sealed class SiteController : ControllerBase
         SiteResource.From(await _commands.UpdateSiteAsync(
             OrganizationController.ParseId(siteId, "site_id"), request.Name, request.Address,
             request.District, request.FloorAreaM2, request.ContractedPowerKw,
-            request.TariffCategory));
+            request.TariffCategory, request.ExcludesSundaysFromPeak ?? false));
 
     [HttpDelete("{siteId}")]
     public async Task<IActionResult> Archive(string siteId)
@@ -146,7 +147,7 @@ public sealed class SiteController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Zonas vigentes del local.</summary>
+    /// <summary>Active zones of the site.</summary>
     [HttpGet("{siteId}/zones")]
     public async Task<List<ZoneResource>> ListZones(string siteId)
     {

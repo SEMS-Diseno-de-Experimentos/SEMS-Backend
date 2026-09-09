@@ -4,7 +4,7 @@ using Sems.Api.Modules.Payments.Domain.Model;
 
 namespace Sems.Api.Modules.Payments.Interfaces;
 
-/// <summary>Contrato JSON del modulo de pagos, en snake_case como el original.</summary>
+/// <summary>JSON contract of the payments module, in snake_case as in the original service.</summary>
 public static class PaymentResources
 {
     // ------------------------------------------------------------- peticiones
@@ -28,7 +28,7 @@ public static class PaymentResources
         [Required(ErrorMessage = "is required")] string StripePaymentMethodId,
         [property: JsonPropertyName("is_default")] bool IsDefault);
 
-    /// <summary>Cuerpo que envia la aplicacion web para abrir Stripe Checkout.</summary>
+    /// <summary>Body the web application sends to open Stripe Checkout.</summary>
     public sealed record CreateCheckoutRequest(
         [property: JsonPropertyName("user_id")]
         [Required(ErrorMessage = "is required")] string UserId,

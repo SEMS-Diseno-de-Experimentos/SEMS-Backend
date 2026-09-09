@@ -110,7 +110,7 @@ public static class AnalyticsResources
             p.EnergyCost, p.PowerCost, p.GeneratedAt, p.CreatedAt);
     }
 
-    /// <summary>Peticion de proyeccion de recibo para un local.</summary>
+    /// <summary>Bill forecast request for a site.</summary>
     public sealed record ForecastSiteBillRequest(
         [property: JsonPropertyName("user_id")]
         [Required(ErrorMessage = "is required")] string UserId,

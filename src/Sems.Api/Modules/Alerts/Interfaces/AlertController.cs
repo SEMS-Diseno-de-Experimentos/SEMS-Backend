@@ -25,7 +25,7 @@ public sealed class AlertController : ControllerBase
 
     // ------------------------------------------------------------------ alertas
 
-    /// <summary>Crea una alerta.</summary>
+    /// <summary>Creates an alert.</summary>
     [HttpPost("alerts")]
     public async Task<ActionResult<AlertResponse>> Create([FromBody] CreateAlertRequest r)
     {
@@ -35,30 +35,30 @@ public sealed class AlertController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, AlertResponse.From(alert));
     }
 
-    /// <summary>Lista todas las alertas.</summary>
+    /// <summary>Lists every alert.</summary>
     [HttpGet("alerts")]
     public async Task<List<AlertResponse>> All() =>
         (await _queries.AllAlertsAsync()).Select(AlertResponse.From).ToList();
 
-    /// <summary>Obtiene una alerta por su identificador.</summary>
+    /// <summary>Gets an alert by its identifier.</summary>
     [HttpGet("alerts/{id:guid}")]
     public async Task<AlertResponse> ById(Guid id) =>
         AlertResponse.From(await _queries.AlertByIdAsync(id));
 
-    /// <summary>Cambia el estado de una alerta.</summary>
+    /// <summary>Changes the status of an alert.</summary>
     [HttpPatch("alerts/{id:guid}/status")]
     public async Task<AlertResponse> UpdateStatus(Guid id,
         [FromBody] UpdateAlertStatusRequest r) =>
         AlertResponse.From(await _commands.UpdateStatusAsync(id, r.Status, r.ResolvedAt));
 
-    /// <summary>Alertas de un usuario.</summary>
+    /// <summary>Alerts for a user.</summary>
     [HttpGet("users/{userId:guid}/alerts")]
     public async Task<List<AlertResponse>> ByUser(Guid userId) =>
         (await _queries.AlertsByUserAsync(userId)).Select(AlertResponse.From).ToList();
 
     // ----------------------------------------------------------------- umbrales
 
-    /// <summary>Crea un umbral de consumo.</summary>
+    /// <summary>Creates a consumption threshold.</summary>
     [HttpPost("thresholds")]
     public async Task<ActionResult<ThresholdResponse>> CreateThreshold(
         [FromBody] CreateThresholdRequest r)
@@ -69,14 +69,14 @@ public sealed class AlertController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, ThresholdResponse.From(threshold));
     }
 
-    /// <summary>Umbrales de un usuario.</summary>
+    /// <summary>A user's thresholds.</summary>
     [HttpGet("users/{userId:guid}/thresholds")]
     public async Task<List<ThresholdResponse>> ThresholdsByUser(Guid userId) =>
         (await _queries.ThresholdsByUserAsync(userId)).Select(ThresholdResponse.From).ToList();
 
     // ------------------------------------------------- reglas de inactividad
 
-    /// <summary>Crea una regla de inactividad.</summary>
+    /// <summary>Creates an inactivity rule.</summary>
     [HttpPost("inactivity-rules")]
     public async Task<ActionResult<InactivityRuleResponse>> CreateRule(
         [FromBody] CreateInactivityRuleRequest r)
@@ -86,14 +86,14 @@ public sealed class AlertController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, InactivityRuleResponse.From(rule));
     }
 
-    /// <summary>Reglas de inactividad de un usuario.</summary>
+    /// <summary>A user's inactivity rules.</summary>
     [HttpGet("users/{userId:guid}/inactivity-rules")]
     public async Task<List<InactivityRuleResponse>> RulesByUser(Guid userId) =>
         (await _queries.RulesByUserAsync(userId)).Select(InactivityRuleResponse.From).ToList();
 
     // ------------------------------------------ preferencias de notificacion
 
-    /// <summary>Guarda una preferencia de notificacion.</summary>
+    /// <summary>Saves a notification preference.</summary>
     [HttpPost("notification-preferences")]
     public async Task<ActionResult<PreferenceResponse>> CreatePreference(
         [FromBody] CreatePreferenceRequest r)
@@ -103,14 +103,14 @@ public sealed class AlertController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, PreferenceResponse.From(preference));
     }
 
-    /// <summary>Preferencias de notificacion de un usuario.</summary>
+    /// <summary>A user's notification preferences.</summary>
     [HttpGet("users/{userId:guid}/notification-preferences")]
     public async Task<List<PreferenceResponse>> PreferencesByUser(Guid userId) =>
         (await _queries.PreferencesByUserAsync(userId)).Select(PreferenceResponse.From).ToList();
 
     // ------------------------------------------------------ reglas de demanda
 
-    /// <summary>Crea una regla de vigilancia de demanda para un local.</summary>
+    /// <summary>Creates a demand-watch rule for a site.</summary>
     [HttpPost("demand-rules")]
     public async Task<ActionResult<DemandRuleResponse>> CreateDemandRule(
         [FromBody] CreateDemandRuleRequest request)
@@ -121,14 +121,14 @@ public sealed class AlertController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, DemandRuleResponse.From(regla));
     }
 
-    /// <summary>Reglas de demanda activas de un local.</summary>
+    /// <summary>Active demand rules for a site.</summary>
     [HttpGet("sites/{siteId:guid}/demand-rules")]
     public async Task<List<DemandRuleResponse>> DemandRulesBySite(Guid siteId) =>
         (await _commands.DemandRulesBySiteAsync(siteId)).Select(DemandRuleResponse.From).ToList();
 
     /// <summary>
-    /// Evalua una demanda medida contra las reglas del local y levanta las
-    /// alertas que correspondan.
+    /// Evaluates a measured demand against the site rules and raises the
+    /// corresponding alerts.
     /// </summary>
     [HttpPost("sites/{siteId:guid}/demand-evaluations")]
     public async Task<List<AlertResponse>> EvaluateDemand(Guid siteId,

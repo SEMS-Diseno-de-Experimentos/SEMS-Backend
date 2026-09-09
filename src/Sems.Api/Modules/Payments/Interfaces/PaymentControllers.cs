@@ -5,7 +5,7 @@ using static Sems.Api.Modules.Payments.Interfaces.PaymentResources;
 
 namespace Sems.Api.Modules.Payments.Interfaces;
 
-/// <summary>Cobros y sesiones de pago.</summary>
+/// <summary>Charges and payment sessions.</summary>
 [ApiController]
 [Route("api/v1/payments")]
 [Tags("Payments")]
@@ -20,7 +20,7 @@ public sealed class PaymentController : ControllerBase
         _queries = queries;
     }
 
-    /// <summary>Cobra con una tarjeta guardada.</summary>
+    /// <summary>Charges a saved card.</summary>
     [HttpPost("process")]
     public async Task<ActionResult<ProcessPaymentResponse>> Process(
         [FromBody] ProcessPaymentRequest request)
@@ -36,10 +36,10 @@ public sealed class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Abre una sesion de Stripe Checkout.
+    /// Opens a Stripe Checkout session.
     ///
-    /// <para>Devuelve la URL a la que la aplicacion web debe redirigir. Los datos
-    /// de la tarjeta se introducen en la pagina de Stripe, nunca en SEMS.</para>
+    /// <para>Returns the URL the web application must redirect to. Card details
+    /// are entered on Stripe's page, never in SEMS.</para>
     /// </summary>
     [HttpPost("checkout-session")]
     public async Task<CheckoutSessionResponse> CreateCheckoutSession(
@@ -55,24 +55,24 @@ public sealed class PaymentController : ControllerBase
         return new CheckoutSessionResponse(session.SessionId, session.Url);
     }
 
-    /// <summary>Pagos de un usuario.</summary>
+    /// <summary>A user's payments.</summary>
     [HttpGet("user/{userId:guid}")]
     public async Task<List<PaymentResponse>> ByUser(Guid userId) =>
         (await _queries.PaymentsByUserAsync(userId)).Select(PaymentResponse.From).ToList();
 
-    /// <summary>Pagos de una suscripcion.</summary>
+    /// <summary>Payments of a subscription.</summary>
     [HttpGet("subscription/{subscriptionId:guid}")]
     public async Task<List<PaymentResponse>> BySubscription(Guid subscriptionId) =>
         (await _queries.PaymentsBySubscriptionAsync(subscriptionId))
         .Select(PaymentResponse.From).ToList();
 
-    /// <summary>Obtiene un pago por su identificador.</summary>
+    /// <summary>Gets a payment by its identifier.</summary>
     [HttpGet("{paymentId:guid}")]
     public async Task<PaymentResponse> ById(Guid paymentId) =>
         PaymentResponse.From(await _queries.PaymentByIdAsync(paymentId));
 }
 
-/// <summary>Medios de pago guardados del usuario.</summary>
+/// <summary>Payment methods saved by the user.</summary>
 [ApiController]
 [Route("api/v1/payment-methods")]
 [Tags("Payment Methods")]
@@ -87,7 +87,7 @@ public sealed class PaymentMethodController : ControllerBase
         _queries = queries;
     }
 
-    /// <summary>Guarda un medio de pago.</summary>
+    /// <summary>Saves a payment method.</summary>
     [HttpPost]
     public async Task<ActionResult<PaymentMethodResponse>> Register(
         [FromBody] RegisterPaymentMethodRequest request)
@@ -97,17 +97,17 @@ public sealed class PaymentMethodController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, PaymentMethodResponse.From(method));
     }
 
-    /// <summary>Medios de pago de un usuario.</summary>
+    /// <summary>A user's payment methods.</summary>
     [HttpGet("user/{userId:guid}")]
     public async Task<List<PaymentMethodResponse>> ByUser(Guid userId) =>
         (await _queries.MethodsByUserAsync(userId)).Select(PaymentMethodResponse.From).ToList();
 
-    /// <summary>Marca un medio de pago como predeterminado.</summary>
+    /// <summary>Marks a payment method as the default one.</summary>
     [HttpPut("{paymentMethodId:guid}/default")]
     public async Task<PaymentMethodResponse> SetDefault(Guid paymentMethodId) =>
         PaymentMethodResponse.From(await _commands.SetDefaultAsync(paymentMethodId));
 
-    /// <summary>Elimina un medio de pago.</summary>
+    /// <summary>Deletes a payment method.</summary>
     [HttpDelete("{paymentMethodId:guid}")]
     public async Task<IActionResult> Delete(Guid paymentMethodId)
     {
@@ -116,7 +116,7 @@ public sealed class PaymentMethodController : ControllerBase
     }
 }
 
-/// <summary>Comprobantes emitidos por cada cobro completado.</summary>
+/// <summary>Invoices issued for each completed charge.</summary>
 [ApiController]
 [Route("api/v1/invoices")]
 [Tags("Invoices")]
@@ -126,12 +126,12 @@ public sealed class InvoiceController : ControllerBase
 
     public InvoiceController(PaymentQueryService queries) => _queries = queries;
 
-    /// <summary>Obtiene un comprobante por su identificador.</summary>
+    /// <summary>Gets an invoice by its identifier.</summary>
     [HttpGet("{invoiceId:guid}")]
     public async Task<InvoiceResponse> ById(Guid invoiceId) =>
         InvoiceResponse.From(await _queries.InvoiceByIdAsync(invoiceId));
 
-    /// <summary>Comprobante asociado a un pago.</summary>
+    /// <summary>Invoice associated with a payment.</summary>
     [HttpGet("payment/{paymentId:guid}")]
     public async Task<InvoiceResponse> ByPayment(Guid paymentId) =>
         InvoiceResponse.From(await _queries.InvoiceByPaymentAsync(paymentId));
@@ -156,7 +156,7 @@ public sealed class StripeWebhookController : ControllerBase
 
     public StripeWebhookController(WebhookCommandService webhooks) => _webhooks = webhooks;
 
-    /// <summary>Recibe un evento de Stripe.</summary>
+    /// <summary>Receives a Stripe event.</summary>
     [HttpPost("stripe")]
     public async Task<IActionResult> HandleStripe()
     {

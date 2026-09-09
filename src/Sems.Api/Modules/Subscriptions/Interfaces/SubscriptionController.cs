@@ -24,29 +24,29 @@ public sealed class SubscriptionController : ControllerBase
 
     // ------------------------------------------------------------------ planes
 
-    /// <summary>Lista los planes disponibles.</summary>
+    /// <summary>Lists the available plans.</summary>
     [HttpGet("subscription-plans")]
     public async Task<List<PlanResource>> Plans() =>
         (await _service.ActivePlansAsync()).Select(PlanResource.From).ToList();
 
-    /// <summary>Obtiene un plan por su identificador.</summary>
+    /// <summary>Gets a plan by its identifier.</summary>
     [HttpGet("subscription-plans/{planId:guid}")]
     public async Task<PlanResource> PlanById(Guid planId) =>
         PlanResource.From(await _service.PlanByIdAsync(planId));
 
     // ----------------------------------------------------------- suscripciones
 
-    /// <summary>Suscripciones de un usuario.</summary>
+    /// <summary>A user's subscriptions.</summary>
     [HttpGet("subscriptions/users/{userId}")]
     public async Task<List<SubscriptionResource>> ByUser(string userId) =>
         (await _service.SubscriptionsByUserAsync(userId)).Select(SubscriptionResource.From).ToList();
 
-    /// <summary>Obtiene una suscripcion por su identificador.</summary>
+    /// <summary>Gets a subscription by its identifier.</summary>
     [HttpGet("subscriptions/{subscriptionId:guid}")]
     public async Task<SubscriptionResource> ById(Guid subscriptionId) =>
         SubscriptionResource.From(await _service.SubscriptionByIdAsync(subscriptionId));
 
-    /// <summary>Crea una suscripcion.</summary>
+    /// <summary>Creates a subscription.</summary>
     [HttpPost("subscriptions")]
     public async Task<ActionResult<SubscriptionResource>> Create(
         [FromBody] CreateSubscriptionRequest request)
@@ -55,12 +55,12 @@ public sealed class SubscriptionController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, SubscriptionResource.From(subscription));
     }
 
-    /// <summary>Cancela una suscripcion.</summary>
+    /// <summary>Cancels a subscription.</summary>
     [HttpPatch("subscriptions/{subscriptionId:guid}/cancel")]
     public async Task<SubscriptionResource> Cancel(Guid subscriptionId) =>
         SubscriptionResource.From(await _service.CancelAsync(subscriptionId));
 
-    /// <summary>Cambia el plan de una suscripcion.</summary>
+    /// <summary>Changes the plan of a subscription.</summary>
     [HttpPatch("subscriptions/{subscriptionId:guid}/change-plan")]
     public async Task<SubscriptionResource> ChangePlan(Guid subscriptionId,
         [FromBody] ChangePlanRequest request) =>

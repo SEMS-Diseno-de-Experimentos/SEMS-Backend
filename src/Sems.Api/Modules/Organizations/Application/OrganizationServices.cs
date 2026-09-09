@@ -65,7 +65,8 @@ public sealed class OrganizationCommandService
 
     public async Task<Site> RegisterSiteAsync(Guid organizationId, string? siteCode, string? name,
         string? address, string? district, decimal? floorAreaM2, decimal contractedPowerKw,
-        string? tariffCategory, CancellationToken ct = default)
+        string? tariffCategory, bool excludesSundaysFromPeak = false,
+        CancellationToken ct = default)
     {
         var organizacion = await _organizations.FindByIdAsync(organizationId, ct)
                            ?? throw AppException.NotFound("organization not found");
@@ -82,19 +83,20 @@ public sealed class OrganizationCommandService
         }
 
         var local = Site.Register(organizationId, siteCode, name, address, district, floorAreaM2,
-            contractedPowerKw, OrganizationEnums.ToTariffCategory(tariffCategory));
+            contractedPowerKw, OrganizationEnums.ToTariffCategory(tariffCategory),
+            excludesSundaysFromPeak);
         return await _sites.SaveAsync(local, ct);
     }
 
     public async Task<Site> UpdateSiteAsync(Guid siteId, string? name, string? address,
         string? district, decimal? floorAreaM2, decimal contractedPowerKw, string? tariffCategory,
-        CancellationToken ct = default)
+        bool excludesSundaysFromPeak = false, CancellationToken ct = default)
     {
         var local = await _sites.FindByIdAsync(siteId, ct)
                     ?? throw AppException.NotFound("site not found");
 
         local.UpdateDetails(name, address, district, floorAreaM2, contractedPowerKw,
-            OrganizationEnums.ToTariffCategory(tariffCategory));
+            OrganizationEnums.ToTariffCategory(tariffCategory), excludesSundaysFromPeak);
         return await _sites.SaveAsync(local, ct);
     }
 

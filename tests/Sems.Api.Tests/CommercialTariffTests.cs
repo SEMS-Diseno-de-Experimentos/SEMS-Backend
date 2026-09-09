@@ -46,13 +46,36 @@ public class CommercialTariffTests
     }
 
     [Fact]
-    public void El_domingo_no_tiene_hora_punta()
+    public void El_domingo_por_defecto_SI_es_hora_punta()
     {
-        // Domingo 20:00 en Peru: dentro de la franja horaria, pero es domingo.
+        // El pliego fija la hora punta de 18:00 a 23:00 de cada dia del ano. La
+        // exclusion de domingos existe, pero solo "a solicitud del cliente": no es
+        // el caso general. Darla por concedida subestima la factura del domingo,
+        // que para un supermercado es uno de sus dias de mayor afluencia.
         var domingo20hLocal = new DateTime(2026, 9, 14, 1, 0, 0, DateTimeKind.Utc);
 
         Assert.Equal(DayOfWeek.Sunday, HorarioPunta.AHoraLocal(domingo20hLocal).DayOfWeek);
-        Assert.Equal(FranjaHoraria.FUERA_DE_PUNTA, HorarioPunta.FranjaDe(domingo20hLocal));
+        Assert.Equal(FranjaHoraria.PUNTA, HorarioPunta.FranjaDe(domingo20hLocal));
+    }
+
+    [Fact]
+    public void El_domingo_queda_fuera_de_punta_si_el_suministro_tiene_la_exclusion()
+    {
+        var domingo20hLocal = new DateTime(2026, 9, 14, 1, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal(FranjaHoraria.FUERA_DE_PUNTA,
+            HorarioPunta.FranjaDe(domingo20hLocal, excluyeDomingos: true));
+    }
+
+    [Fact]
+    public void La_exclusion_de_domingos_no_afecta_al_resto_de_dias()
+    {
+        // Un suministro con la exclusion concedida sigue teniendo punta de lunes a
+        // sabado: la excepcion es solo para domingos y feriados.
+        var martes19hLocal = new DateTime(2026, 9, 9, 0, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal(FranjaHoraria.PUNTA,
+            HorarioPunta.FranjaDe(martes19hLocal, excluyeDomingos: true));
     }
 
     [Fact]

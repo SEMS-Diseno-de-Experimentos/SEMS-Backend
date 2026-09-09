@@ -194,7 +194,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "SEMS API",
         Version = "v1",
-        Description = "Smart Energy Management System. Monolito modular: un bounded context por modulo."
+        Description = "Smart Energy Management System. Modular monolith: one bounded context per module."
     });
 
     var xml = Path.Combine(AppContext.BaseDirectory,
@@ -237,7 +237,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Pegar aqui el token que devuelve /api/v1/auth/login (solo el token, sin \"Bearer\").",
+        Description = "Paste the token returned by /api/v1/auth/login (the token only, without \"Bearer\").",
         Reference = new Microsoft.OpenApi.Models.OpenApiReference
         {
             Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,

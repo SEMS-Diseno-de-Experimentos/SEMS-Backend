@@ -4,7 +4,7 @@ using Sems.Api.Modules.Alerts.Domain.Model;
 
 namespace Sems.Api.Modules.Alerts.Interfaces;
 
-/// <summary>Contrato JSON del modulo de alertas, en snake_case como el original.</summary>
+/// <summary>JSON contract of the alerts module, in snake_case as in the original service.</summary>
 public static class AlertResources
 {
     // ------------------------------------------------------------- peticiones

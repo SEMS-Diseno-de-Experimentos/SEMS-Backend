@@ -28,27 +28,27 @@ public sealed class AuthenticationController : ControllerBase
         _recovery = recovery;
     }
 
-    /// <summary>Crea una cuenta nueva.</summary>
+    /// <summary>Creates a new account.</summary>
     [HttpPost("register")]
     public async Task<LoginResponse> Register([FromBody] RegisterRequest request) =>
         LoginResponse.From(await _authentication.RegisterAsync(request.EmailAddress,
             request.Password, request.Role));
 
-    /// <summary>Inicia sesion con correo y contrasena.</summary>
+    /// <summary>Signs in with email and password.</summary>
     [HttpPost("login")]
     public async Task<LoginResponse> Login([FromBody] LoginRequest request) =>
         LoginResponse.From(await _authentication.LoginAsync(request.EmailAddress, request.Password));
 
-    /// <summary>Entrega un par de tokens nuevo y rota el de refresco entregado.</summary>
+    /// <summary>Issues a new token pair and rotates the refresh token provided.</summary>
     [HttpPost("refresh")]
     public async Task<LoginResponse> Refresh([FromBody] RefreshRequest request) =>
         LoginResponse.From(await _recovery.RefreshAsync(request.RefreshToken));
 
     /// <summary>
-    /// Cierra la sesion revocando el token de refresco.
+    /// Signs out by revoking the refresh token.
     ///
-    /// <para>Responde 204 siempre: pedir el cierre de una sesion que ya no existe
-    /// no es un error desde el punto de vista del cliente.</para>
+    /// <para>Always answers 204: asking to close a session that no longer exists
+    /// is not an error from the client's point of view.</para>
     /// </summary>
     [HttpPost("logout")]
     public async Task<IActionResult> Logout([FromBody] LogoutRequest? request)
@@ -57,26 +57,27 @@ public sealed class AuthenticationController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Activa la cuenta con el codigo recibido por correo.</summary>
+    /// <summary>Activates the account with the code received by email.</summary>
     [HttpPost("verify")]
     public async Task<LoginResponse> Verify([FromBody] VerifyRequest request) =>
         LoginResponse.From(await _recovery.VerifyAccountAsync(request.Token));
 
     /// <summary>
-    /// Inicia la recuperacion de contrasena.
+    /// Starts the password recovery flow.
     ///
-    /// <para>Responde lo mismo exista o no la cuenta. Contestar distinto
-    /// convertiria este endpoint en un verificador de correos registrados.</para>
+    /// <para>Answers the same whether or not the account exists. Answering
+    /// differently would turn this endpoint into a checker of registered
+    /// emails.</para>
     /// </summary>
     [HttpPost("forgot-password")]
     public async Task<MessageResponse> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         await _recovery.ForgotPasswordAsync(request.EmailAddress);
         return new MessageResponse(
-            "Si el correo esta registrado, recibiras un enlace para cambiar tu contrasena.");
+            "If that email is registered, you will receive a link to reset your password.");
     }
 
-    /// <summary>Cambia la contrasena y cierra todas las sesiones abiertas.</summary>
+    /// <summary>Changes the password and closes every open session.</summary>
     [HttpPost("reset-password")]
     public async Task<MessageResponse> ResetPassword([FromBody] ResetPasswordRequest request)
     {

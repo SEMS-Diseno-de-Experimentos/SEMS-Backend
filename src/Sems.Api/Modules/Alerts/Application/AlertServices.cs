@@ -70,14 +70,14 @@ public sealed class AlertCommandService
 
             var margen = regla.MargenKw(demandaKw);
             var (titulo, mensaje, severidad) = nivel == DemandLevel.WARNING
-                ? ("Demanda cerca de lo contratado",
-                   $"El local esta en {demandaKw:0.##} kW de {regla.ContractedPowerKw:0.##} kW contratados. "
-                   + $"Quedan {margen:0.##} kW de margen.",
+                ? ("Demand close to the contracted limit",
+                   $"The site is at {demandaKw:0.##} kW of {regla.ContractedPowerKw:0.##} kW contracted. "
+                   + $"{margen:0.##} kW of headroom left.",
                    "WARNING")
-                : ("Demanda por encima de lo contratado",
-                   $"El local alcanzo {demandaKw:0.##} kW, {Math.Abs(margen):0.##} kW por encima de los "
-                   + $"{regla.ContractedPowerKw:0.##} kW contratados. El recargo por exceso se aplica a "
-                   + "todo el mes.",
+                : ("Demand above the contracted limit",
+                   $"The site reached {demandaKw:0.##} kW, {Math.Abs(margen):0.##} kW above the "
+                   + $"{regla.ContractedPowerKw:0.##} kW contracted. The excess power charge applies to "
+                   + "the whole month.",
                    "CRITICAL");
 
             var alerta = Alert.Raise(regla.UserId, null, null, null, "DEMAND", titulo, mensaje,
