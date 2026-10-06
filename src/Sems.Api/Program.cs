@@ -183,8 +183,10 @@ var allowedOrigins = (builder.Configuration["AllowedOrigins"]
                       ?? "https://sems-web-application.vercel.app,https://sems-diseno-web.vercel.app,http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+// Solo los origenes de la lista. Aceptar cualquiera junto con AllowCredentials
+// permitiria que cualquier pagina llamara a la API con la sesion del usuario.
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
-    .SetIsOriginAllowed(_ => true)
+    .WithOrigins(allowedOrigins)
     .AllowAnyHeader()
     .AllowAnyMethod()
     .AllowCredentials()));
