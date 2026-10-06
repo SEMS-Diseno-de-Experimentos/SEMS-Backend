@@ -47,6 +47,9 @@ public static class EnergyResources
         [property: JsonPropertyName("reading_type")] string? ReadingType,
         [property: JsonPropertyName("phase")] string? Phase);
 
+    public sealed record SetGoalRequest(
+        [property: JsonPropertyName("monthly_goal_kwh")] double MonthlyGoalKwh);
+
     // -------------------------------------------------------------- respuestas
 
     public sealed record MeterResponse(
@@ -194,5 +197,14 @@ public static class EnergyResources
             b.KwhPunta, b.KwhFueraDePunta, b.DemandaMaximaKw, b.PotenciaContratadaKw,
             b.ExcesoDePotenciaKw, b.HayExcesoDePotencia, b.CostoEnergia, b.CostoPotencia,
             b.PesoDeLaPotencia, b.CargoFijo, b.Subtotal, b.Igv, b.Total, b.Currency);
+    }
+
+    public sealed record GoalResponse(
+        [property: JsonPropertyName("user_id")] string UserId,
+        [property: JsonPropertyName("monthly_goal_kwh")] double MonthlyGoalKwh,
+        [property: JsonPropertyName("updated_at")] DateTime UpdatedAt)
+    {
+        public static GoalResponse From(UserGoal g) => new(
+            g.UserId, g.MonthlyGoalKwh, g.UpdatedAt);
     }
 }

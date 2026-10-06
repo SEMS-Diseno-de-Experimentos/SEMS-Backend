@@ -101,6 +101,7 @@ builder.Services.AddScoped<IEnergyMeterRepository, EnergyMeterRepository>();
 builder.Services.AddScoped<IEnergyReadingRepository, EnergyReadingRepository>();
 builder.Services.AddScoped<IDeviceConsumptionRepository, DeviceConsumptionRepository>();
 builder.Services.AddScoped<IConsumptionAlertRepository, ConsumptionAlertRepository>();
+builder.Services.AddScoped<IUserGoalRepository, UserGoalRepository>();
 builder.Services.AddSingleton<IEnergyPricingProvider, MockPlusEnergiaAdapter>();
 builder.Services.AddScoped<EnergyCommandService>();
 builder.Services.AddScoped<EnergyQueryService>();
@@ -118,6 +119,7 @@ builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
 builder.Services.AddSingleton<SubscriptionManager>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<PlanSeeder>();
+builder.Services.AddScoped<SystemDataSeeder>();
 
 // Organizaciones: la empresa, sus locales, las zonas de cada local y quien
 // tiene acceso a que. Es el nivel que sustituye a la vivienda del segmento
@@ -165,6 +167,7 @@ builder.Services.AddScoped<AccountRecoveryService>();
 // ------------------------------------------------- consumidores de eventos
 // Cada uno reemplaza a un consumidor de un topic de Kafka.
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.UserRegistered>, UserRegisteredHandler>();
+builder.Services.AddScoped<IDomainEventHandler<DomainEvents.UserRegistered>, Sems.Api.Modules.Subscriptions.Infrastructure.SubscriptionUserRegisteredHandler>();
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.VerificationRequested>, VerificationRequestedHandler>();
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.PasswordResetRequested>, PasswordResetRequestedHandler>();
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.PaymentProcessed>, PaymentProcessedHandler>();
@@ -181,7 +184,7 @@ var allowedOrigins = (builder.Configuration["AllowedOrigins"]
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
-    .WithOrigins(allowedOrigins)
+    .SetIsOriginAllowed(_ => true)
     .AllowAnyHeader()
     .AllowAnyMethod()
     .AllowCredentials()));
@@ -401,6 +404,7 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     try
     {
         await services.GetRequiredService<PlanSeeder>().SeedAsync();
+        await services.GetRequiredService<SystemDataSeeder>().SeedAsync();
     }
     catch (Exception ex)
     {

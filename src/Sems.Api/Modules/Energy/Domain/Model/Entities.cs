@@ -290,7 +290,31 @@ public class ConsumptionAlert
         ResolvedAt = DateTime.UtcNow;
     }
 
-    /// <summary>Cuanto se paso el valor real por encima del limite, en porcentaje.</summary>
     public double ExcessPercentage() =>
         ThresholdValue == 0 ? 0.0 : (ActualValue - ThresholdValue) / ThresholdValue * 100;
 }
+
+public class UserGoal
+{
+    public Guid Id { get; private set; }
+    public string UserId { get; private set; } = string.Empty;
+    public double MonthlyGoalKwh { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
+
+    private UserGoal() {}
+
+    public static UserGoal Create(string userId, double monthlyGoalKwh) => new()
+    {
+        Id = Guid.NewGuid(),
+        UserId = userId,
+        MonthlyGoalKwh = monthlyGoalKwh,
+        UpdatedAt = DateTime.UtcNow
+    };
+
+    public void UpdateGoal(double monthlyGoalKwh)
+    {
+        MonthlyGoalKwh = monthlyGoalKwh;
+        UpdatedAt = DateTime.UtcNow;
+    }
+}
+

@@ -78,6 +78,17 @@ public sealed class ConsumptionAlertConfig : IEntityTypeConfiguration<Consumptio
     }
 }
 
+public sealed class UserGoalConfig : IEntityTypeConfiguration<UserGoal>
+{
+    public void Configure(EntityTypeBuilder<UserGoal> builder)
+    {
+        builder.ToTable("em_user_goals");
+        builder.HasKey(g => g.Id);
+        builder.Property(g => g.UserId).HasMaxLength(80).IsRequired();
+        builder.HasIndex(g => g.UserId).IsUnique();
+    }
+}
+
 // ---------------------------------------------------------------- adaptadores
 
 public sealed class EnergyMeterRepository : IEnergyMeterRepository
@@ -205,4 +216,24 @@ public sealed class ConsumptionAlertRepository : IConsumptionAlertRepository
         CancellationToken ct = default) =>
         _db.Set<ConsumptionAlert>().Where(a => a.UserId == userId && !a.IsRead)
             .OrderByDescending(a => a.CreatedAt).ToListAsync(ct);
+}
+
+public sealed class UserGoalRepository : IUserGoalRepository
+{
+    private readonly SemsDbContext _db;
+
+    public UserGoalRepository(SemsDbContext db) => _db = db;
+
+    public Task<UserGoal?> FindByUserIdAsync(string userId, CancellationToken ct = default) =>
+        _db.Set<UserGoal>().FirstOrDefaultAsync(g => g.UserId == userId, ct);
+
+    public async Task<UserGoal> SaveAsync(UserGoal goal, CancellationToken ct = default)
+    {
+        if (_db.Entry(goal).State == EntityState.Detached)
+        {
+            _db.Add(goal);
+        }
+        await _db.SaveChangesAsync(ct);
+        return goal;
+    }
 }

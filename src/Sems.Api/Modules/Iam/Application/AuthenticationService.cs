@@ -24,9 +24,19 @@ public sealed class AuthenticationService
     private readonly IIamEventPublisher _events;
     private readonly bool _requireVerification;
 
+    private readonly Sems.Api.Modules.Devices.Application.DeviceCommandService _devices;
+    private readonly Sems.Api.Modules.Energy.Application.EnergyCommandService _energy;
+    private readonly Sems.Api.Modules.Organizations.Application.OrganizationCommandService _organizations;
+
+    private readonly IServiceProvider _serviceProvider;
+
     public AuthenticationService(IUserRepository users, IPasswordHashingService hashing,
         ITokenService tokens, AuthTokenService authTokens, IIamEventPublisher events,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        Sems.Api.Modules.Devices.Application.DeviceCommandService devices,
+        Sems.Api.Modules.Energy.Application.EnergyCommandService energy,
+        Sems.Api.Modules.Organizations.Application.OrganizationCommandService organizations,
+        IServiceProvider serviceProvider)
     {
         _users = users;
         _hashing = hashing;
@@ -37,6 +47,10 @@ public sealed class AuthenticationService
             configuration["Security:RequireVerification"]
             ?? Environment.GetEnvironmentVariable("REQUIRE_VERIFICATION"),
             "true", StringComparison.OrdinalIgnoreCase);
+        _devices = devices;
+        _energy = energy;
+        _organizations = organizations;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task<SessionResult> RegisterAsync(string? emailAddress, string? password,
@@ -58,15 +72,145 @@ public sealed class AuthenticationService
 
         _events.PublishUserRegistered(user.UserId, user.EmailAddress, user.Role.ToString());
 
-        // El codigo de verificacion se emite y se pide por evento: el envio del
-        // correo ocurre en el modulo de notificaciones, tras confirmar.
         if (_requireVerification)
         {
             var verificationToken = await _authTokens.IssueVerificationTokenAsync(user.UserId, ct);
             _events.PublishVerificationRequested(user.UserId, user.EmailAddress, verificationToken);
         }
 
+        var sp = _serviceProvider;
+        var uId = user.UserId;
+        var e = user.EmailAddress;
+        _ = Task.Run(async () => {
+            using var scope = sp.CreateScope();
+            var auth = scope.ServiceProvider.GetRequiredService<AuthenticationService>();
+            try {
+                await auth.SeedDemoDataAsync(uId, e, CancellationToken.None);
+            } catch (Exception ex) { 
+                Console.WriteLine($"SEEDING ERROR: {ex}");
+            }
+        });
+
         return await BuildSessionAsync(user, ct);
+    }
+
+    private async Task SeedDemoDataAsync(Guid userId, string email, CancellationToken ct)
+    {
+        var random = new Random();
+        var types = new[] { "HVAC", "LIGHTING", "REFRIGERATION", "MACHINERY", "OTHER" };
+        var brands = new[] { "Samsung", "LG", "Siemens", "General Electric", "Philips" };
+        var models = new[] { "X100", "Pro V2", "EcoSmart", "Industrial", "Basic" };
+
+        // 1. Create a default Organization and Site for this user
+        var taxId = "20" + random.Next(100000000, 999999999).ToString();
+        var (org, _) = await _organizations.RegisterAsync("Mi Hogar / Empresa", "Principal", taxId, "OTHER", userId, ct);
+        var site = await _organizations.RegisterSiteAsync(org.OrganizationId, "SITE-01", "Sede Principal", "Av. Siempre Viva 123", "Lima", 120, 10, "BT5B", false, ct);
+
+        // 2. Create a default Energy Meter
+        var meter = await _energy.RegisterMeterAsync(
+            userId.ToString(),
+            $"METER-{random.Next(10000, 99999)}",
+            "SmartMeter V1",
+            "EOS",
+            "Main Board",
+            "1.0.0",
+            10000.0,
+            ct
+        );
+
+        var realNames = new[] { "Luces Pasadizo", "Refrigerador Principal", "Aire Acondicionado Sala", "Horno Industrial", "Servidor Rack 1", "TV Recepción", "Letrero Luminoso", "Cargador Coche Eléctrico", "Bomba de Agua" };
+        var randomStatuses = new[] { "ACTIVE", "ACTIVE", "ACTIVE", "INACTIVE", "INACTIVE", "MAINTENANCE" };
+
+        for (int i = 1; i <= 9; i++)
+        {
+            var deviceType = types[random.Next(types.Length)];
+            var brand = brands[random.Next(brands.Length)];
+            var model = models[random.Next(models.Length)];
+
+            // RegisterAsync signature: externalCode, userId, siteId, zoneId, name, type, brand, model, protocol
+            var device = await _devices.RegisterAsync(
+                $"EXT-{userId.ToString().Substring(0, 4)}-{i}", 
+                userId, 
+                site.SiteId, 
+                null, 
+                realNames[i-1], 
+                deviceType, 
+                brand, 
+                model, 
+                "WIFI", 
+                ct);
+                
+            var initialStatus = randomStatuses[random.Next(randomStatuses.Length)];
+            if (initialStatus != "ACTIVE")
+            {
+                await _devices.ChangeStatusAsync(device.DeviceId, initialStatus, ct);
+            }
+
+            // Record some readings!
+            double currentKwh = 100.0 + random.NextDouble() * 50.0;
+            
+            for (int day = 13; day >= 0; day--)
+            {
+                var dailyKwh = 5.0 + random.NextDouble() * 235.0; 
+                var dailyPower = dailyKwh * 1000.0 / 5.0; // Reverse calculate power assuming 5 hours
+                currentKwh += dailyKwh;
+                
+                await _energy.RecordReadingAsync(
+                    userId.ToString(), 
+                    meter.Id.ToString(), 
+                    device.DeviceId.ToString(),
+                    dailyPower, 
+                    220.0, 
+                    5.0 + random.NextDouble() * 5.0, 
+                    60.0, 
+                    dailyKwh, 
+                    DateTime.UtcNow.AddDays(-day), 
+                    initialStatus, 
+                    "A", 
+                    ct);
+            }
+                
+            if (random.Next(100) < 30) // 30% chance for an alert
+            {
+                await _energy.RaiseAlertAsync(
+                    userId.ToString(), 
+                    device.DeviceId.ToString(), 
+                    null, 
+                    Sems.Api.Modules.Energy.Domain.Model.AlertType.high_consumption, 
+                    Sems.Api.Modules.Energy.Domain.Model.AlertSeverity.high, 
+                    1500.0, 
+                    1800.0, 
+                    $"Consumo anormal detectado de 1800W", 
+                    ct);
+            }
+        }
+
+        // Set a global monthly goal so alerts can trigger!
+        await _energy.SetUserGoalAsync(userId.ToString(), 1500.0, ct);
+
+        // Generate analytics rankings
+        using var scope = _serviceProvider.CreateScope();
+        var energyQueries = scope.ServiceProvider.GetRequiredService<Sems.Api.Modules.Energy.Application.EnergyQueryService>();
+        var analytics = scope.ServiceProvider.GetRequiredService<Sems.Api.Modules.Analytics.Application.AnalyticsService>();
+
+        var rankings = new List<Sems.Api.Modules.Analytics.Domain.Model.RankingItem>();
+        int rank = 1;
+        var deviceConsumptions = await energyQueries.ConsumptionsByUserAsync(userId.ToString(), ct);
+        foreach (var dc in deviceConsumptions.OrderByDescending(x => x.TotalKwh).Take(5))
+        {
+            var r = new Sems.Api.Modules.Analytics.Domain.Model.RankingItem(
+                rank++, 
+                dc.DeviceId.ToString(), 
+                dc.DeviceName, 
+                dc.TotalKwh, 
+                dc.CostEstimateSoles, 
+                0, 
+                "PEN"
+            );
+            rankings.Add(r);
+        }
+        
+        await analytics.CreateRankingAsync(userId.ToString(), "monthly", DateTime.UtcNow.AddDays(-30), DateTime.UtcNow, rankings, ct);
     }
 
     public async Task<SessionResult> LoginAsync(string? emailAddress, string? password,

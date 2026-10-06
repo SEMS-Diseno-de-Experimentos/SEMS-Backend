@@ -14,6 +14,7 @@ public enum DeviceStatus
     ACTIVE,
     INACTIVE,
     DISCONNECTED,
+    MAINTENANCE,
     REMOVED
 }
 
@@ -29,7 +30,9 @@ public enum BindingStatus
 public enum ConnectionProtocol
 {
     WIFI,
-    BLUETOOTH
+    BLUETOOTH,
+    ZIGBEE,
+    MATTER
 }
 
 public static class DeviceEnums
@@ -83,6 +86,6 @@ public static class DeviceEnums
         {
             return true;
         }
-        return next is DeviceStatus.ACTIVE or DeviceStatus.INACTIVE or DeviceStatus.DISCONNECTED;
+        return next is DeviceStatus.ACTIVE or DeviceStatus.INACTIVE or DeviceStatus.DISCONNECTED or DeviceStatus.MAINTENANCE;
     }
 }

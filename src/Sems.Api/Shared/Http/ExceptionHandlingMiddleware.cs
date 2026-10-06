@@ -35,6 +35,7 @@ public sealed class ExceptionHandlingMiddleware
         }
         catch (AppException ex)
         {
+            _logger.LogWarning(ex, "AppException lanzada: {Code} - {Message}", ex.Code, ex.Message);
             await WriteAsync(context, StatusFor(ex.Code), ex.Code.ToString(), ex.Message);
         }
         catch (FormatException)

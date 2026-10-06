@@ -38,3 +38,9 @@ public interface IConsumptionAlertRepository
     Task<List<ConsumptionAlert>> FindByUserIdAsync(string userId, CancellationToken ct = default);
     Task<List<ConsumptionAlert>> FindUnreadByUserIdAsync(string userId, CancellationToken ct = default);
 }
+
+public interface IUserGoalRepository
+{
+    Task<UserGoal?> FindByUserIdAsync(string userId, CancellationToken ct = default);
+    Task<UserGoal> SaveAsync(UserGoal goal, CancellationToken ct = default);
+}

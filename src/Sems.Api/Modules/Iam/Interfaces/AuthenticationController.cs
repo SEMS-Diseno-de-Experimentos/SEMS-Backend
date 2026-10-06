@@ -20,19 +20,24 @@ public sealed class AuthenticationController : ControllerBase
 {
     private readonly AuthenticationService _authentication;
     private readonly AccountRecoveryService _recovery;
+    private readonly Sems.Api.Shared.Persistence.SystemDataSeeder _seeder;
 
     public AuthenticationController(AuthenticationService authentication,
-        AccountRecoveryService recovery)
+        AccountRecoveryService recovery, Sems.Api.Shared.Persistence.SystemDataSeeder seeder)
     {
         _authentication = authentication;
         _recovery = recovery;
+        _seeder = seeder;
     }
 
     /// <summary>Creates a new account.</summary>
     [HttpPost("register")]
-    public async Task<LoginResponse> Register([FromBody] RegisterRequest request) =>
-        LoginResponse.From(await _authentication.RegisterAsync(request.EmailAddress,
-            request.Password, request.Role));
+    public async Task<LoginResponse> Register([FromBody] RegisterRequest request)
+    {
+        var result = await _authentication.RegisterAsync(request.EmailAddress, request.Password, request.Role);
+        try { await _seeder.SeedForUserAsync(request.EmailAddress); } catch { /* ignore seeding errors */ }
+        return LoginResponse.From(result);
+    }
 
     /// <summary>Signs in with email and password.</summary>
     [HttpPost("login")]

@@ -12,15 +12,17 @@ public sealed class EnergyCommandService
     private readonly IEnergyMeterRepository _meters;
     private readonly IEnergyReadingRepository _readings;
     private readonly IConsumptionAlertRepository _alerts;
+    private readonly IUserGoalRepository _goals;
     private readonly IEnergyPricingProvider _pricing;
     private readonly IDomainEventBus _bus;
 
     public EnergyCommandService(IEnergyMeterRepository meters, IEnergyReadingRepository readings,
-        IConsumptionAlertRepository alerts, IEnergyPricingProvider pricing, IDomainEventBus bus)
+        IConsumptionAlertRepository alerts, IUserGoalRepository goals, IEnergyPricingProvider pricing, IDomainEventBus bus)
     {
         _meters = meters;
         _readings = readings;
         _alerts = alerts;
+        _goals = goals;
         _pricing = pricing;
         _bus = bus;
     }
@@ -152,6 +154,23 @@ public sealed class EnergyCommandService
     private async Task<ConsumptionAlert> RequireAlertAsync(Guid alertId, CancellationToken ct) =>
         await _alerts.FindByIdAsync(alertId, ct)
         ?? throw AppException.NotFound($"Alert '{alertId}' not found");
+
+    public async Task<UserGoal> SetUserGoalAsync(string userId, double monthlyGoalKwh, CancellationToken ct = default)
+    {
+        if (monthlyGoalKwh < 0)
+            throw AppException.Validation("Goal cannot be negative");
+            
+        var goal = await _goals.FindByUserIdAsync(userId, ct);
+        if (goal == null)
+        {
+            goal = UserGoal.Create(userId, monthlyGoalKwh);
+        }
+        else
+        {
+            goal.UpdateGoal(monthlyGoalKwh);
+        }
+        return await _goals.SaveAsync(goal, ct);
+    }
 }
 
 /// <summary>Casos de uso de solo lectura del modulo de energia.</summary>
@@ -161,14 +180,16 @@ public sealed class EnergyQueryService
     private readonly IEnergyReadingRepository _readings;
     private readonly IDeviceConsumptionRepository _consumptions;
     private readonly IConsumptionAlertRepository _alerts;
+    private readonly IUserGoalRepository _goals;
 
     public EnergyQueryService(IEnergyMeterRepository meters, IEnergyReadingRepository readings,
-        IDeviceConsumptionRepository consumptions, IConsumptionAlertRepository alerts)
+        IDeviceConsumptionRepository consumptions, IConsumptionAlertRepository alerts, IUserGoalRepository goals)
     {
         _meters = meters;
         _readings = readings;
         _consumptions = consumptions;
         _alerts = alerts;
+        _goals = goals;
     }
 
     public async Task<EnergyMeter> MeterByIdAsync(Guid meterId, CancellationToken ct = default) =>
@@ -218,4 +239,10 @@ public sealed class EnergyQueryService
 
     public Task<List<ConsumptionAlert>> UnreadAlertsByUserAsync(string userId,
         CancellationToken ct = default) => _alerts.FindUnreadByUserIdAsync(userId, ct);
+
+    public async Task<UserGoal> GoalByUserAsync(string userId, CancellationToken ct = default)
+    {
+        var goal = await _goals.FindByUserIdAsync(userId, ct);
+        return goal ?? UserGoal.Create(userId, 0); // Default to 0
+    }
 }

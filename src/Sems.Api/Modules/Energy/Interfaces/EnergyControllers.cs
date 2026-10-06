@@ -218,3 +218,27 @@ public sealed class ConsumptionAlertController : ControllerBase
     public async Task<AlertResponse> Resolve(Guid alertId) =>
         AlertResponse.From(await _commands.ResolveAlertAsync(alertId));
 }
+
+/// <summary>User energy goals.</summary>
+[ApiController]
+[Route("api/v1/users/{userId}/goals")]
+[Tags("User Goals")]
+public sealed class UserGoalController : ControllerBase
+{
+    private readonly EnergyCommandService _commands;
+    private readonly EnergyQueryService _queries;
+
+    public UserGoalController(EnergyCommandService commands, EnergyQueryService queries)
+    {
+        _commands = commands;
+        _queries = queries;
+    }
+
+    [HttpGet]
+    public async Task<GoalResponse> GetGoal(string userId) =>
+        GoalResponse.From(await _queries.GoalByUserAsync(userId));
+
+    [HttpPut]
+    public async Task<GoalResponse> SetGoal(string userId, [FromBody] SetGoalRequest request) =>
+        GoalResponse.From(await _commands.SetUserGoalAsync(userId, request.MonthlyGoalKwh));
+}

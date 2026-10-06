@@ -41,36 +41,34 @@ public sealed class PlanSeeder
         // en un solo local, asi que un tope de tres o diez no separa a un
         // cliente pequeno de una cadena; solo estorba. Lo que de verdad escala
         // con el tamano del cliente es cuantos locales gestiona.
-        var basico = SubscriptionPlan.Create("Starter",
-            "One site, with the essentials to start measuring", 0, "PEN", "monthly");
-        basico.AddFeature("BASIC_DASHBOARD", "Site consumption dashboard", "enabled");
-        basico.AddFeature("CONSUMPTION_ALERTS", "Consumption alerts", "enabled");
-        basico.AddFeature("SITES_LIMIT", "Sites included", "1");
-        basico.AddFeature("DEVICES_PER_SITE_LIMIT", "Meters per site", "10");
+        var basico = SubscriptionPlan.Create("Básico",
+            "Un local, con lo esencial para empezar a medir", 29.90, "PEN", "monthly");
+        basico.AddFeature("BASIC_DASHBOARD", "Dashboard de consumo por local", "enabled");
+        basico.AddFeature("CONSUMPTION_ALERTS", "Alertas de consumo", "enabled");
+        basico.AddFeature("SITES_LIMIT", "Locales incluidos", "1");
+        basico.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "10");
         AddStripePrice(basico, "Stripe:Price:Free", "STRIPE_PRICE_FREE");
         await _plans.SaveAsync(basico, ct);
 
-        var negocio = SubscriptionPlan.Create("Business",
-            "For small chains, with demand control", 149, "PEN", "monthly");
-        negocio.AddFeature("BASIC_INCLUDED", "Everything in Starter", "enabled");
-        negocio.AddFeature("SITES_LIMIT", "Sites included", "5");
-        negocio.AddFeature("DEVICES_PER_SITE_LIMIT", "Meters per site", "50");
-        negocio.AddFeature("ZONE_ANALYTICS", "Consumption broken down by zone", "enabled");
-        // El aviso de demanda es lo que justifica el salto de plan: evitar un
-        // solo pico al mes ya paga la diferencia con el plan Basico.
-        negocio.AddFeature("DEMAND_ALERTS", "Demand warning before exceeding the contracted power", "enabled");
-        negocio.AddFeature("PEAK_HOUR_REPORTS", "Peak-hour consumption reports", "enabled");
+        var negocio = SubscriptionPlan.Create("Pro",
+            "Para pequeñas cadenas, con control de demanda", 79.90, "PEN", "monthly");
+        negocio.AddFeature("BASIC_INCLUDED", "Todo lo de Básica", "enabled");
+        negocio.AddFeature("SITES_LIMIT", "Locales incluidos", "5");
+        negocio.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "50");
+        negocio.AddFeature("ZONE_ANALYTICS", "Consumo desglosado por zona", "enabled");
+        negocio.AddFeature("DEMAND_ALERTS", "Aviso de demanda antes de superar potencia contratada", "enabled");
+        negocio.AddFeature("PEAK_HOUR_REPORTS", "Reportes de consumo en hora punta", "enabled");
         AddStripePrice(negocio, "Stripe:Price:Plus", "STRIPE_PRICE_PLUS");
         await _plans.SaveAsync(negocio, ct);
 
         var corporativo = SubscriptionPlan.Create("Enterprise",
-            "Large chains, with site-to-site benchmarking", 399, "PEN", "monthly");
-        corporativo.AddFeature("BUSINESS_INCLUDED", "Everything in Business", "enabled");
-        corporativo.AddFeature("SITES_LIMIT", "Sites included", "unlimited");
-        corporativo.AddFeature("DEVICES_PER_SITE_LIMIT", "Meters per site", "unlimited");
-        corporativo.AddFeature("SITE_BENCHMARKING", "Performance benchmarking across sites", "enabled");
-        corporativo.AddFeature("TARIFF_OPTIMIZATION", "Tariff category analysis", "enabled");
-        corporativo.AddFeature("PRIORITY_SUPPORT", "Priority support", "enabled");
+            "Grandes cadenas, con benchmarking entre locales", 129.90, "PEN", "monthly");
+        corporativo.AddFeature("BUSINESS_INCLUDED", "Todo lo de Premium", "enabled");
+        corporativo.AddFeature("SITES_LIMIT", "Locales incluidos", "ilimitado");
+        corporativo.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "ilimitado");
+        corporativo.AddFeature("SITE_BENCHMARKING", "Benchmarking de eficiencia entre locales", "enabled");
+        corporativo.AddFeature("TARIFF_OPTIMIZATION", "Análisis de categoría tarifaria", "enabled");
+        corporativo.AddFeature("PRIORITY_SUPPORT", "Soporte prioritario", "enabled");
         AddStripePrice(corporativo, "Stripe:Price:Pro", "STRIPE_PRICE_PRO");
         await _plans.SaveAsync(corporativo, ct);
     }
