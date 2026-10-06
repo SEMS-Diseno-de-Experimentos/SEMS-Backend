@@ -98,6 +98,19 @@ public class Membership
         UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Devuelve el acceso a quien se le habia revocado, con el papel indicado.
+    /// </summary>
+    /// <remarks>
+    /// Se reutiliza el mismo vinculo en lugar de crear otro: una persona tiene un
+    /// solo vinculo por organizacion, y el indice unico de la tabla lo exige.
+    /// </remarks>
+    public void Reinstate(MembershipRole role, Guid? siteId)
+    {
+        ChangeRole(role, siteId);
+        Status = OrgStatus.ACTIVE;
+    }
+
     public bool IsActive => Status == OrgStatus.ACTIVE;
 
     /// <summary>Si este vinculo permite ver o tocar el local indicado.</summary>

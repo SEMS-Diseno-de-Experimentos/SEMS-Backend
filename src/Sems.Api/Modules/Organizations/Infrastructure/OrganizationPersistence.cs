@@ -216,7 +216,8 @@ public sealed class MembershipRepository : IMembershipRepository
 
     public Task<Membership?> FindByOrganizationAndUserAsync(Guid organizationId, Guid userId,
         CancellationToken ct = default) =>
+        // Incluye los revocados: el indice unico (organizacion, usuario) impide
+        // crear un segundo vinculo, asi que el revocado se reutiliza.
         _db.Set<Membership>().FirstOrDefaultAsync(
-            m => m.OrganizationId == organizationId && m.UserId == userId
-                 && m.Status != OrgStatus.ARCHIVED, ct);
+            m => m.OrganizationId == organizationId && m.UserId == userId, ct);
 }

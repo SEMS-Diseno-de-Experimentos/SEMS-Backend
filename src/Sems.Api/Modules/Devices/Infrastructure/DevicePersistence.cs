@@ -90,8 +90,10 @@ public sealed class DeviceRepository : IDeviceRepository
     public Task<Device?> FindByIdAsync(Guid deviceId, CancellationToken ct = default) =>
         _db.Set<Device>().FirstOrDefaultAsync(d => d.DeviceId == deviceId, ct);
 
+    /// <summary>Dispositivos vigentes. Los dados de baja no salen, igual que en el resto de listados.</summary>
     public Task<List<Device>> FindAllAsync(CancellationToken ct = default) =>
-        _db.Set<Device>().OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
+        _db.Set<Device>().Where(d => d.Status != DeviceStatus.REMOVED)
+            .OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
 
     /// <summary>Dispositivos vigentes del usuario. Los borrados no salen.</summary>
     /// <remarks>

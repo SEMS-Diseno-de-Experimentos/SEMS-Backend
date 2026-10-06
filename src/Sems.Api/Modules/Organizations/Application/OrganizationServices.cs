@@ -169,7 +169,16 @@ public sealed class OrganizationCommandService
 
         if (existente is not null)
         {
-            existente.ChangeRole(papel, siteId);
+            // A quien se le revoco el acceso se le devuelve el mismo vinculo:
+            // crear otro chocaba con el indice unico y respondia 500.
+            if (existente.IsActive)
+            {
+                existente.ChangeRole(papel, siteId);
+            }
+            else
+            {
+                existente.Reinstate(papel, siteId);
+            }
             return await _memberships.SaveAsync(existente, ct);
         }
 

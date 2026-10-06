@@ -9,12 +9,28 @@ public class SystemDataSeeder
 {
     private readonly AuthenticationService _auth;
     private readonly SemsDbContext _context;
+    private readonly bool _enabled;
 
-    public SystemDataSeeder(AuthenticationService auth, SemsDbContext context)
+    public SystemDataSeeder(AuthenticationService auth, SemsDbContext context,
+        IConfiguration configuration)
     {
         _auth = auth;
         _context = context;
+        _enabled = DemoDataEnabled(configuration);
     }
+
+    /// <summary>
+    /// Si se cargan datos de demostracion al registrar una cuenta.
+    /// </summary>
+    /// <remarks>
+    /// Activado salvo que <c>Seeding:DemoData</c> (o <c>SEED_DEMO_DATA</c>) valga
+    /// <c>false</c>. Las pruebas lo apagan: la siembra corre en segundo plano y
+    /// competiria por la base con la propia prueba.
+    /// </remarks>
+    public static bool DemoDataEnabled(IConfiguration configuration) =>
+        !string.Equals(configuration["Seeding:DemoData"]
+                       ?? Environment.GetEnvironmentVariable("SEED_DEMO_DATA"),
+            "false", StringComparison.OrdinalIgnoreCase);
 
     public async Task SeedAsync()
     {
@@ -35,6 +51,11 @@ public class SystemDataSeeder
 
     public async Task SeedForUserAsync(string email)
     {
+        if (!_enabled)
+        {
+            return;
+        }
+
         var userIdStr = await _context.Database.SqlQueryRaw<string>(
             "SELECT \"UserId\"::text FROM iam_users WHERE \"EmailAddress\" = {0} LIMIT 1", email)
             .FirstOrDefaultAsync();

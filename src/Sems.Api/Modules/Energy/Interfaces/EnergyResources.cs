@@ -163,7 +163,9 @@ public static class EnergyResources
             t.Provider, t.TariffCategory, t.Currency, t.EnergiaPuntaPorKwh,
             t.EnergiaFueraDePuntaPorKwh, t.PotenciaPorKwMes, t.ExcesoDePotenciaPorKwMes,
             t.CargoFijoMensual, t.Igv,
-            $"{HorarioPunta.HoraInicio:00}:00-{HorarioPunta.HoraFin:00}:00 lun-sab",
+            // Todos los dias: el pliego solo excluye los domingos a solicitud del
+            // cliente, y esa exclusion es de cada suministro, no de la tarifa.
+            $"{HorarioPunta.HoraInicio:00}:00-{HorarioPunta.HoraFin:00}:00 every day",
             HorarioPunta.EsHoraPunta(DateTime.UtcNow), t.Timestamp);
     }
 

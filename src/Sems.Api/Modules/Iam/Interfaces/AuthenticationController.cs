@@ -87,6 +87,6 @@ public sealed class AuthenticationController : ControllerBase
     public async Task<MessageResponse> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         await _recovery.ResetPasswordAsync(request.Token, request.NewPassword);
-        return new MessageResponse("Contrasena actualizada correctamente.");
+        return new MessageResponse("Password updated successfully.");
     }
 }

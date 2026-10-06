@@ -36,3 +36,8 @@ secrets.json
 # ------------------------------------------------------------------ sistema
 .DS_Store
 Thumbs.db
+
+# ------------------------------------------------------------------- pruebas
+coveragereport/
+# Codigo que genera SpecFlow a partir de cada .feature al compilar
+*.feature.cs

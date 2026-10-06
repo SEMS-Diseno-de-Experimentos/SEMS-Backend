@@ -23,6 +23,7 @@ public sealed class AuthenticationService
     private readonly AuthTokenService _authTokens;
     private readonly IIamEventPublisher _events;
     private readonly bool _requireVerification;
+    private readonly bool _seedDemoData;
 
     private readonly Sems.Api.Modules.Devices.Application.DeviceCommandService _devices;
     private readonly Sems.Api.Modules.Energy.Application.EnergyCommandService _energy;
@@ -47,6 +48,7 @@ public sealed class AuthenticationService
             configuration["Security:RequireVerification"]
             ?? Environment.GetEnvironmentVariable("REQUIRE_VERIFICATION"),
             "true", StringComparison.OrdinalIgnoreCase);
+        _seedDemoData = Sems.Api.Shared.Persistence.SystemDataSeeder.DemoDataEnabled(configuration);
         _devices = devices;
         _energy = energy;
         _organizations = organizations;
@@ -78,18 +80,21 @@ public sealed class AuthenticationService
             _events.PublishVerificationRequested(user.UserId, user.EmailAddress, verificationToken);
         }
 
-        var sp = _serviceProvider;
-        var uId = user.UserId;
-        var e = user.EmailAddress;
-        _ = Task.Run(async () => {
-            using var scope = sp.CreateScope();
-            var auth = scope.ServiceProvider.GetRequiredService<AuthenticationService>();
-            try {
-                await auth.SeedDemoDataAsync(uId, e, CancellationToken.None);
-            } catch (Exception ex) { 
-                Console.WriteLine($"SEEDING ERROR: {ex}");
-            }
-        });
+        if (_seedDemoData)
+        {
+            var sp = _serviceProvider;
+            var uId = user.UserId;
+            var e = user.EmailAddress;
+            _ = Task.Run(async () => {
+                using var scope = sp.CreateScope();
+                var auth = scope.ServiceProvider.GetRequiredService<AuthenticationService>();
+                try {
+                    await auth.SeedDemoDataAsync(uId, e, CancellationToken.None);
+                } catch (Exception ex) {
+                    Console.WriteLine($"SEEDING ERROR: {ex}");
+                }
+            });
+        }
 
         return await BuildSessionAsync(user, ct);
     }
@@ -332,8 +337,12 @@ public sealed class AccountRecoveryService
             return;
         }
 
-        var token = await _authTokens.IssuePasswordResetTokenAsync(user.UserId, ct);
-        _events.PublishPasswordResetRequested(user.UserId, user.EmailAddress, token);
+        // El evento se publica antes de guardar el token, no despues: el bus lo
+        // entrega cuando esa escritura confirma. Publicado tras el ultimo
+        // guardado se quedaba en cola y el enlace nunca llegaba por correo.
+        await _authTokens.IssuePasswordResetTokenAsync(user.UserId,
+            token => _events.PublishPasswordResetRequested(user.UserId, user.EmailAddress, token),
+            ct);
     }
 
     /// <summary>
