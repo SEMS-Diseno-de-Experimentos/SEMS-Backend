@@ -11,10 +11,8 @@ WORKDIR /src
 
 # Primero solo los archivos de proyecto: mientras no cambien las dependencias,
 # Docker reutiliza la capa del restore y la build tarda segundos en vez de minutos.
-COPY SemsBackend.sln ./
 COPY src/Sems.Api/Sems.Api.csproj src/Sems.Api/
-COPY tests/Sems.Api.Tests/Sems.Api.Tests.csproj tests/Sems.Api.Tests/
-RUN dotnet restore
+RUN dotnet restore src/Sems.Api/Sems.Api.csproj
 
 COPY . .
 RUN dotnet publish src/Sems.Api/Sems.Api.csproj -c Release -o /app --no-restore
