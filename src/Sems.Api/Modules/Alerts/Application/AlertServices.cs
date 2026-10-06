@@ -82,6 +82,12 @@ public sealed class AlertCommandService
 
             var alerta = Alert.Raise(regla.UserId, null, null, null, "DEMAND", titulo, mensaje,
                 severidad, null, DateTime.UtcNow);
+
+            // Igual que el resto de alertas: el correo lo envia quien escucha
+            // este evento. Sin el, la alerta se guardaba pero nadie se enteraba.
+            _bus.Publish(new DomainEvents.AlertTriggered(regla.UserId, alerta.AlertId, "DEMAND",
+                severidad, mensaje));
+
             levantadas.Add(await _alerts.SaveAsync(alerta, ct));
         }
 
