@@ -164,7 +164,7 @@ public static class ApiRequests
 
     public static Task<HttpResponseMessage> PostReadingAsync(this HttpClient client, Guid userId,
         string meterId, string? deviceId, double powerWatts, double frequency = 60.0,
-        double energyKwh = 1.0) =>
+        double energyKwh = 1.0, DateTime? timestamp = null) =>
         client.PostJsonAsync("/api/v1/energy-readings", new
         {
             user_id = userId.ToString(),
@@ -175,6 +175,7 @@ public static class ApiRequests
             current = 150.0,
             frequency,
             energy_kwh = energyKwh,
+            timestamp,
             reading_type = "real_time",
             phase = "three"
         });
