@@ -104,10 +104,23 @@ public sealed class AuthTokenService
     }
 
     public Task<string> IssueVerificationTokenAsync(Guid userId, CancellationToken ct = default) =>
-        IssueSingleUseAsync(userId, UserAuthToken.PurposeVerification, VerificationTtl, ct);
+        IssueSingleUseAsync(userId, UserAuthToken.PurposeVerification, VerificationTtl, null, ct);
 
     public Task<string> IssuePasswordResetTokenAsync(Guid userId, CancellationToken ct = default) =>
-        IssueSingleUseAsync(userId, UserAuthToken.PurposePasswordReset, ResetTtl, ct);
+        IssueSingleUseAsync(userId, UserAuthToken.PurposePasswordReset, ResetTtl, null, ct);
+
+    /// <summary>
+    /// Emite el token de recuperacion y entrega su valor a
+    /// <paramref name="beforeSave"/> antes de guardarlo.
+    /// </summary>
+    /// <remarks>
+    /// Sirve para publicar el evento que lleva el enlace por correo. El bus
+    /// despacha los eventos al confirmar una escritura: publicado despues del
+    /// ultimo guardado, el evento se quedaria en cola y el correo no saldria.
+    /// </remarks>
+    public Task<string> IssuePasswordResetTokenAsync(Guid userId, Action<string> beforeSave,
+        CancellationToken ct = default) =>
+        IssueSingleUseAsync(userId, UserAuthToken.PurposePasswordReset, ResetTtl, beforeSave, ct);
 
     /// <summary>Valida y marca como usado un token de un solo uso.</summary>
     /// <returns>el identificador del usuario dueno del token</returns>
@@ -132,9 +145,10 @@ public sealed class AuthTokenService
     }
 
     private async Task<string> IssueSingleUseAsync(Guid userId, string purpose, TimeSpan ttl,
-        CancellationToken ct)
+        Action<string>? beforeSave, CancellationToken ct)
     {
         var raw = RandomToken();
+        beforeSave?.Invoke(raw);
         await _authTokens.SaveAsync(UserAuthToken.Issue(userId, Sha256(raw), purpose,
             DateTime.UtcNow.Add(ttl)), ct);
         return raw;

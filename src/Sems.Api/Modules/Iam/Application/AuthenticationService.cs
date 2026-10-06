@@ -337,8 +337,12 @@ public sealed class AccountRecoveryService
             return;
         }
 
-        var token = await _authTokens.IssuePasswordResetTokenAsync(user.UserId, ct);
-        _events.PublishPasswordResetRequested(user.UserId, user.EmailAddress, token);
+        // El evento se publica antes de guardar el token, no despues: el bus lo
+        // entrega cuando esa escritura confirma. Publicado tras el ultimo
+        // guardado se quedaba en cola y el enlace nunca llegaba por correo.
+        await _authTokens.IssuePasswordResetTokenAsync(user.UserId,
+            token => _events.PublishPasswordResetRequested(user.UserId, user.EmailAddress, token),
+            ct);
     }
 
     /// <summary>
