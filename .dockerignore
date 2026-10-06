@@ -1,12 +1,16 @@
-.git
-.idea
-target
+**/bin/
+**/obj/
+**/TestResults/
+.git/
+.gitignore
+.vs/
+.vscode/
+.idea/
+
+# Nunca debe entrar en la imagen: las credenciales se inyectan como variables
+# de entorno en el hosting, no se hornean en el contenedor.
 .env
-*.iml
-*.iws
-*.ipr
-*.log
-docker-compose.yml
-README.md
-gateway/
-scripts/
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.Production.json
