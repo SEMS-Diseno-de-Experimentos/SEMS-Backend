@@ -124,7 +124,7 @@ public sealed class EnergyCommandService
 
     /// <summary>Tarifa comercial vigente para una categoria del pliego.</summary>
     public CommercialTariff CurrentTariff(string? tariffCategory) =>
-        _pricing.CurrentTariff(tariffCategory);
+        _pricing.CurrentTariff(TariffCategories.Normalize(tariffCategory));
 
     /// <summary>
     /// Estima la factura del mes de un local a partir de su consumo por franja
@@ -147,7 +147,7 @@ public sealed class EnergyCommandService
             throw AppException.Validation("contracted_power_kw must be greater than zero");
         }
 
-        return _pricing.CurrentTariff(tariffCategory)
+        return _pricing.CurrentTariff(TariffCategories.Normalize(tariffCategory))
             .Calcular(kwhPunta, kwhFueraDePunta, demandaMaximaKw, potenciaContratadaKw);
     }
 

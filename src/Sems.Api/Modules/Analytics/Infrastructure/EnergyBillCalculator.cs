@@ -1,4 +1,5 @@
 using Sems.Api.Modules.Analytics.Domain.Services;
+using Sems.Api.Modules.Energy.Domain.Model;
 using Sems.Api.Modules.Energy.Domain.Services;
 
 namespace Sems.Api.Modules.Analytics.Infrastructure;
@@ -19,7 +20,7 @@ public sealed class EnergyBillCalculator : IBillCalculator
     public EstimatedBill Estimate(string? tariffCategory, double kwhPeak, double kwhOffPeak,
         double maxDemandKw, double contractedPowerKw)
     {
-        var tarifa = _pricing.CurrentTariff(tariffCategory);
+        var tarifa = _pricing.CurrentTariff(TariffCategories.Normalize(tariffCategory));
         var desglose = tarifa.Calcular((decimal)kwhPeak, (decimal)kwhOffPeak,
             (decimal)maxDemandKw, (decimal)contractedPowerKw);
 
