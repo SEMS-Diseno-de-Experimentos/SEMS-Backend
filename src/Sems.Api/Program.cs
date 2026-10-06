@@ -419,3 +419,15 @@ else
 }
 
 app.Run();
+
+/// <summary>
+/// Punto de entrada de la aplicacion.
+/// </summary>
+/// <remarks>
+/// La clase que generan las instrucciones de nivel superior es interna. Se
+/// declara publica para que las pruebas puedan levantar la API completa con
+/// <c>WebApplicationFactory&lt;Program&gt;</c>.
+/// </remarks>
+public partial class Program
+{
+}
