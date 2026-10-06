@@ -1,8 +1,9 @@
 using System.Text.Json;
+using Sems.Api.Modules.Energy.Domain.Model;
 using Sems.Api.Modules.Energy.Interfaces;
 using Xunit;
 
-namespace Sems.Api.Tests;
+namespace Sems.Api.Tests.Energy;
 
 /// <summary>
 /// El modulo de energia nacio en FastAPI y serializaba en snake_case. El
@@ -16,7 +17,7 @@ namespace Sems.Api.Tests;
 public class EnergyContractTests
 {
     [Fact]
-    public void ReadingResponse_se_serializa_en_snake_case()
+    public void ReadingResponse_Serialized_UsesSnakeCase()
     {
         var response = new EnergyResources.ReadingResponse(
             Id: Guid.NewGuid().ToString(),
@@ -45,7 +46,7 @@ public class EnergyContractTests
     }
 
     [Fact]
-    public void CreateReadingRequest_se_deserializa_desde_snake_case()
+    public void CreateReadingRequest_SnakeCaseBody_IsDeserialized()
     {
         const string body = """
             {
@@ -71,7 +72,7 @@ public class EnergyContractTests
     }
 
     [Fact]
-    public void ConsumptionResponse_conserva_los_nombres_del_dashboard()
+    public void ConsumptionResponse_Serialized_KeepsTheDashboardFieldNames()
     {
         var response = new EnergyResources.ConsumptionResponse(
             Id: Guid.NewGuid().ToString(),
@@ -95,5 +96,54 @@ public class EnergyContractTests
         Assert.Contains("\"cost_estimate_soles\"", json);
         Assert.Contains("\"peak_power_watts\"", json);
         Assert.Contains("\"reading_count\"", json);
+    }
+
+    [Fact]
+    public void EstimateBillRequest_SnakeCaseBody_IsDeserialized()
+    {
+        const string body = """
+            {
+              "tariff_category": "MT2",
+              "contracted_power_kw": 250,
+              "kwh_peak": 12000,
+              "kwh_off_peak": 48000,
+              "max_demand_kw": 280
+            }
+            """;
+
+        var request = JsonSerializer.Deserialize<EnergyResources.EstimateBillRequest>(body);
+
+        Assert.NotNull(request);
+        Assert.Equal("MT2", request!.TariffCategory);
+        Assert.Equal(250m, request.ContractedPowerKw);
+        Assert.Equal(48000m, request.KwhOffPeak);
+        Assert.Equal(280m, request.MaxDemandKw);
+    }
+
+    [Fact]
+    public void BillEstimateResponse_Serialized_UsesSnakeCase()
+    {
+        var breakdown = new BillBreakdown(12000m, 48000m, 280m, 250m, 30m, 14868m, 17228m, 12.80m,
+            32108.80m, 5779.58m, 37888.38m, "PEN");
+
+        var json = JsonSerializer.Serialize(EnergyResources.BillEstimateResponse.From(breakdown));
+
+        Assert.Contains("\"energy_cost\"", json);
+        Assert.Contains("\"power_cost\"", json);
+        Assert.Contains("\"has_power_excess\"", json);
+        Assert.Contains("\"power_share_pct\"", json);
+        Assert.DoesNotContain("\"energyCost\"", json);
+    }
+
+    [Fact]
+    public void TariffResponse_AnyTariff_PublishesPeakHoursForEveryDay()
+    {
+        var tariff = new CommercialTariff("Plus Energia", "MT2", "PEN", 0.2810m, 0.2395m, 58.40m,
+            87.60m, 12.80m, 0.18m, DateTime.UtcNow);
+
+        var response = EnergyResources.TariffResponse.From(tariff);
+
+        Assert.Equal("18:00-23:00 every day", response.PeakHours);
+        Assert.Contains("\"peak_hours\"", JsonSerializer.Serialize(response));
     }
 }

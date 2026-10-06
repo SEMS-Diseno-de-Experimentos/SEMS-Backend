@@ -3,10 +3,10 @@ using Sems.Api.Modules.Alerts.Domain.Model;
 using Sems.Api.Shared.Errors;
 using Xunit;
 
-namespace Sems.Api.Tests;
+namespace Sems.Api.Tests.Alerts;
 
 /// <summary>
-/// Evaluacion de umbrales y de inactividad.
+/// Evaluacion de umbrales y de inactividad, y estado de las alertas.
 ///
 /// <para>Es la logica que decide si al usuario le llega un correo. Un fallo aqui
 /// no rompe nada visible: simplemente el aviso no se envia, o se envia a
@@ -15,7 +15,7 @@ namespace Sems.Api.Tests;
 public class AlertDomainTests
 {
     [Fact]
-    public void El_operador_se_serializa_como_simbolo_no_como_nombre()
+    public void Serialize_Operator_UsesTheSymbolNotTheName()
     {
         // La interfaz muestra ">", no "GREATER_THAN".
         //
@@ -37,7 +37,7 @@ public class AlertDomainTests
     }
 
     [Fact]
-    public void El_operador_se_acepta_por_simbolo_y_por_nombre()
+    public void ToOperator_SymbolOrName_IsAccepted()
     {
         Assert.Equal(Operator.GREATER_THAN, OperatorExtensions.ToOperator(">"));
         Assert.Equal(Operator.GREATER_THAN_OR_EQUAL, OperatorExtensions.ToOperator(">="));
@@ -47,14 +47,14 @@ public class AlertDomainTests
     }
 
     [Fact]
-    public void Un_operador_desconocido_se_rechaza()
+    public void ToOperator_UnknownOperator_ThrowsValidationError()
     {
         var error = Assert.Throws<AppException>(() => OperatorExtensions.ToOperator("=>"));
         Assert.Equal(ErrorCode.VALIDATION_ERROR, error.Code);
     }
 
     [Fact]
-    public void El_umbral_solo_se_rompe_cuando_la_comparacion_se_cumple()
+    public void IsBreachedBy_StrictGreaterThan_OnlyBreaksWhenTheComparisonHolds()
     {
         var threshold = AlertThreshold.Create(Guid.NewGuid(), Guid.NewGuid(),
             "Consumo alto", "power_watts", Operator.GREATER_THAN, 1000, true);
@@ -65,7 +65,7 @@ public class AlertDomainTests
     }
 
     [Fact]
-    public void Un_umbral_desactivado_no_dispara_nada()
+    public void IsBreachedBy_DeactivatedThreshold_NeverBreaks()
     {
         var threshold = AlertThreshold.Create(Guid.NewGuid(), null,
             "Consumo alto", "power_watts", Operator.GREATER_THAN, 1000, true);
@@ -77,7 +77,7 @@ public class AlertDomainTests
     }
 
     [Fact]
-    public void La_regla_de_inactividad_se_mide_desde_la_ultima_senal()
+    public void IsInactive_MeasuredFromTheLastSignal_CountsTheLimitAsInactive()
     {
         var rule = InactivityRule.Create(Guid.NewGuid(), Guid.NewGuid(), "Sin reportar", 60, true);
         var now = DateTime.UtcNow;
@@ -88,7 +88,7 @@ public class AlertDomainTests
     }
 
     [Fact]
-    public void Sin_ultima_senal_o_con_umbral_no_positivo_la_regla_no_dispara()
+    public void IsInactive_WithoutLastSignalOrWithNonPositiveLimit_NeverFires()
     {
         var now = DateTime.UtcNow;
 
@@ -102,7 +102,7 @@ public class AlertDomainTests
     }
 
     [Fact]
-    public void Al_resolver_una_alerta_se_sella_la_fecha_aunque_no_la_manden()
+    public void UpdateStatus_Resolved_StampsTheDateEvenIfNotSent()
     {
         var alert = Alert.Raise(Guid.NewGuid(), Guid.NewGuid(), null, null,
             "threshold", "Consumo alto", "El dispositivo supero el umbral", "high", null, null);
@@ -114,5 +114,27 @@ public class AlertDomainTests
 
         Assert.Equal(Alert.StatusResolved, alert.Status);
         Assert.NotNull(alert.ResolvedAt);
+    }
+
+    [Fact]
+    public void UpdateStatus_ResolvedWithADate_KeepsTheDateSent()
+    {
+        var alert = Alert.Raise(Guid.NewGuid(), null, null, null, "DEMAND", "Demand", "msg",
+            "WARNING", null, null);
+        var resolvedAt = new DateTime(2026, 10, 5, 22, 15, 0, DateTimeKind.Utc);
+
+        alert.UpdateStatus(Alert.StatusResolved, resolvedAt);
+
+        Assert.Equal(resolvedAt, alert.ResolvedAt);
+    }
+
+    [Theory]
+    [InlineData(Operator.GREATER_THAN_OR_EQUAL, 1000, true)]
+    [InlineData(Operator.LESS_THAN, 999, true)]
+    [InlineData(Operator.LESS_THAN_OR_EQUAL, 1001, false)]
+    [InlineData(Operator.EQUAL, 1000, true)]
+    public void Test_EachOperator_ComparesAgainstTheThreshold(Operator op, double value, bool expected)
+    {
+        Assert.Equal(expected, op.Test(value, 1000));
     }
 }

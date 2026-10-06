@@ -4,7 +4,7 @@ using Sems.Api.Modules.Subscriptions.Interfaces;
 using Sems.Api.Shared.Errors;
 using Xunit;
 
-namespace Sems.Api.Tests;
+namespace Sems.Api.Tests.Subscriptions;
 
 /// <summary>
 /// Suscripciones tiene el contrato mas fragil de todo el backend: <b>las
@@ -22,7 +22,7 @@ namespace Sems.Api.Tests;
 public class SubscriptionContractTests
 {
     [Fact]
-    public void CreateSubscriptionRequest_se_lee_en_snake_case()
+    public void CreateSubscriptionRequest_SnakeCaseBody_IsDeserialized()
     {
         const string body = """
             {
@@ -41,12 +41,12 @@ public class SubscriptionContractTests
     }
 
     [Fact]
-    public void SubscriptionResource_se_devuelve_en_PascalCase()
+    public void SubscriptionResource_Serialized_UsesPascalCase()
     {
         var subscription = Subscription.Start(
             Guid.NewGuid().ToString(), Guid.NewGuid(), "sub_test_123");
 
-        var json = JsonSerializer.Serialize(SubscriptionResource(subscription));
+        var json = JsonSerializer.Serialize(SubscriptionResources.SubscriptionResource.From(subscription));
 
         Assert.Contains("\"SubscriptionID\"", json);
         Assert.Contains("\"UserID\"", json);
@@ -59,10 +59,10 @@ public class SubscriptionContractTests
     }
 
     [Fact]
-    public void PlanResource_incluye_sus_caracteristicas_tambien_en_PascalCase()
+    public void PlanResource_Serialized_IncludesItsFeaturesAlsoInPascalCase()
     {
-        var plan = SubscriptionPlan.Create("Plus", "Plan intermedio", 29.9, "PEN", "monthly");
-        plan.AddFeature("MAX_DEVICES", "Dispositivos", "10");
+        var plan = SubscriptionPlan.Create("Pro", "Plan intermedio", 79.9, "PEN", "monthly");
+        plan.AddFeature("SITES_LIMIT", "Locales incluidos", "5");
 
         var json = JsonSerializer.Serialize(SubscriptionResources.PlanResource.From(plan));
 
@@ -74,12 +74,12 @@ public class SubscriptionContractTests
     }
 
     [Fact]
-    public void StripePriceId_solo_lo_devuelve_la_caracteristica_correcta()
+    public void StripePriceId_PlanFeatures_OnlyTheStripePriceFeatureCounts()
     {
-        var plan = SubscriptionPlan.Create("Pro", null, 59.9, null, null);
+        var plan = SubscriptionPlan.Create("Pro", null, 79.9, null, null);
         Assert.Null(plan.StripePriceId());
 
-        plan.AddFeature("MAX_DEVICES", "Dispositivos", "50");
+        plan.AddFeature("SITES_LIMIT", "Locales incluidos", "5");
         Assert.Null(plan.StripePriceId());
 
         plan.AddFeature(PlanFeature.StripePriceIdCode, "Precio en Stripe", "price_test_123");
@@ -87,7 +87,7 @@ public class SubscriptionContractTests
     }
 
     [Fact]
-    public void Un_estado_desconocido_se_rechaza_en_lugar_de_asumir_uno()
+    public void ToSubscriptionStatus_UnknownStatus_ThrowsValidationErrorInsteadOfAssumingOne()
     {
         Assert.Equal(SubscriptionStatus.ACTIVE,
             SubscriptionStatusExtensions.ToSubscriptionStatus("active"));
@@ -98,7 +98,7 @@ public class SubscriptionContractTests
     }
 
     [Fact]
-    public void Una_suscripcion_cancelada_queda_en_estado_final()
+    public void Cancel_ActiveSubscription_LeavesItInAFinalStatus()
     {
         var subscription = Subscription.Start(Guid.NewGuid().ToString(), Guid.NewGuid(), null);
         Assert.False(subscription.Status.IsFinal());
@@ -109,7 +109,4 @@ public class SubscriptionContractTests
         Assert.True(subscription.Status.IsFinal());
         Assert.NotNull(subscription.EndDate);
     }
-
-    private static SubscriptionResources.SubscriptionResource SubscriptionResource(Subscription s) =>
-        SubscriptionResources.SubscriptionResource.From(s);
 }

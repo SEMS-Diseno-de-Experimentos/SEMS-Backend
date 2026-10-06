@@ -1,7 +1,7 @@
 using Sems.Api.Modules.Energy.Domain.Model;
 using Xunit;
 
-namespace Sems.Api.Tests;
+namespace Sems.Api.Tests.Energy;
 
 /// <summary>
 /// Tarifa comercial: franjas horarias y cargo por potencia.
@@ -28,7 +28,7 @@ public class CommercialTariffTests
     // ------------------------------------------------------- horario de punta
 
     [Fact]
-    public void Las_siete_de_la_tarde_de_un_martes_es_hora_punta()
+    public void FranjaDe_TuesdaySevenPmLocal_IsPeak()
     {
         // 19:00 en Peru son las 00:00 UTC del dia siguiente. Si se evaluara en
         // UTC saldria fuera de punta, que es justo lo contrario.
@@ -38,7 +38,7 @@ public class CommercialTariffTests
     }
 
     [Fact]
-    public void Las_diez_de_la_manana_no_es_hora_punta()
+    public void FranjaDe_TenAmLocal_IsOffPeak()
     {
         var martes10hLocal = new DateTime(2026, 9, 8, 15, 0, 0, DateTimeKind.Utc);
 
@@ -46,7 +46,7 @@ public class CommercialTariffTests
     }
 
     [Fact]
-    public void El_domingo_por_defecto_SI_es_hora_punta()
+    public void FranjaDe_SundayEveningByDefault_IsPeak()
     {
         // El pliego fija la hora punta de 18:00 a 23:00 de cada dia del ano. La
         // exclusion de domingos existe, pero solo "a solicitud del cliente": no es
@@ -59,7 +59,7 @@ public class CommercialTariffTests
     }
 
     [Fact]
-    public void El_domingo_queda_fuera_de_punta_si_el_suministro_tiene_la_exclusion()
+    public void FranjaDe_SundayEveningWithTheExclusion_IsOffPeak()
     {
         var domingo20hLocal = new DateTime(2026, 9, 14, 1, 0, 0, DateTimeKind.Utc);
 
@@ -68,7 +68,7 @@ public class CommercialTariffTests
     }
 
     [Fact]
-    public void La_exclusion_de_domingos_no_afecta_al_resto_de_dias()
+    public void FranjaDe_WeekdayWithTheSundayExclusion_IsStillPeak()
     {
         // Un suministro con la exclusion concedida sigue teniendo punta de lunes a
         // sabado: la excepcion es solo para domingos y feriados.
@@ -79,7 +79,7 @@ public class CommercialTariffTests
     }
 
     [Fact]
-    public void Las_veintitres_en_punto_ya_esta_fuera_de_punta()
+    public void FranjaDe_ElevenPmSharp_IsAlreadyOffPeak()
     {
         // El limite superior no se incluye: la franja es [18:00, 23:00).
         var martes23hLocal = new DateTime(2026, 9, 9, 4, 0, 0, DateTimeKind.Utc);
@@ -90,7 +90,7 @@ public class CommercialTariffTests
     // ------------------------------------------------------ cargo por potencia
 
     [Fact]
-    public void Un_pico_puntual_encarece_el_mes_entero_sin_gastar_mas_energia()
+    public void Calculate_SameEnergyWithAPeakOf150KwOver120Contracted_KeepsEnergyCostAndAddsOver3000()
     {
         // Este es el motivo de modelar la potencia. Mismo consumo de energia,
         // misma factura de energia, y sin embargo el total sube mas de tres mil
@@ -108,34 +108,58 @@ public class CommercialTariffTests
     }
 
     [Fact]
-    public void El_exceso_sobre_lo_contratado_se_cobra_a_precio_de_penalizacion()
+    public void CostoDePotencia_DemandOf150KwWith120Contracted_ChargesTheExcessAtPenaltyPrice()
     {
         var tarifa = TarifaMT2();
 
         var factura = tarifa.Calcular(0m, 0m, demandaMaximaKw: 150m, potenciaContratadaKw: 120m);
 
         // 120 kW al precio normal y 30 kW al de penalizacion, no 150 al normal.
-        var esperado = 120m * 58.40m + 30m * 87.60m;
-        Assert.Equal(esperado, factura.CostoPotencia);
+        Assert.Equal(120m * 58.40m + 30m * 87.60m, factura.CostoPotencia);
         Assert.True(factura.HayExcesoDePotencia);
         Assert.Equal(30m, factura.ExcesoDePotenciaKw);
     }
 
-    [Fact]
-    public void Sin_superar_lo_contratado_no_hay_penalizacion()
+    [Theory]
+    [InlineData(100, false, 0)]
+    [InlineData(120, false, 0)]
+    [InlineData(120.01, true, 0.01)]
+    public void Calculate_DemandAroundTheContractedPower_ReportsExcessOnlyAboveIt(decimal demand,
+        bool expectedExcess, decimal expectedExcessKw)
     {
-        var factura = TarifaMT2().Calcular(0m, 0m, demandaMaximaKw: 100m,
+        var factura = TarifaMT2().Calcular(0m, 0m, demand, potenciaContratadaKw: 120m);
+
+        Assert.Equal(expectedExcess, factura.HayExcesoDePotencia);
+        Assert.Equal(expectedExcessKw, factura.ExcesoDePotenciaKw);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5000)]
+    [InlineData(250000)]
+    public void CostoDePotencia_AnyEnergyConsumed_IsAlwaysTheSame(decimal kwh)
+    {
+        var factura = TarifaMT2().Calcular(kwh / 4m, kwh * 3m / 4m, demandaMaximaKw: 130m,
             potenciaContratadaKw: 120m);
 
-        Assert.False(factura.HayExcesoDePotencia);
-        Assert.Equal(0m, factura.ExcesoDePotenciaKw);
-        Assert.Equal(100m * 58.40m, factura.CostoPotencia);
+        Assert.Equal(120m * 58.40m + 10m * 87.60m, factura.CostoPotencia);
+    }
+
+    [Fact]
+    public void CostoDePotencia_WithoutRegisteredDemand_IsZero()
+    {
+        // Un local recien dado de alta todavia no tiene lecturas. Cobrarle
+        // potencia sobre una demanda de cero seria inventarse un cargo.
+        var factura = TarifaMT2().Calcular(0m, 0m, demandaMaximaKw: 0m,
+            potenciaContratadaKw: 120m);
+
+        Assert.Equal(0m, factura.CostoPotencia);
     }
 
     // -------------------------------------------------------------- la factura
 
     [Fact]
-    public void Mover_consumo_fuera_de_punta_abarata_la_factura()
+    public void Calculate_ConsumptionMovedOffPeak_LowersTheBill()
     {
         // Es la recomendacion principal que la aplicacion le dara a un local:
         // desplazar cargas que admiten horario, como el bombeo o el
@@ -151,26 +175,45 @@ public class CommercialTariffTests
         Assert.Equal(30000m, pocaPunta.KwhPunta + pocaPunta.KwhFueraDePunta);
     }
 
-    [Fact]
-    public void El_igv_se_aplica_sobre_el_subtotal_y_el_total_cuadra()
+    [Theory]
+    [InlineData(1, 0, 0)]          // 13.08 + 2.35: el caso que descuadraba un centimo
+    [InlineData(0, 1, 0)]
+    [InlineData(3, 7, 0)]
+    [InlineData(1000, 2000, 50)]
+    [InlineData(6000, 24000, 150)]
+    [InlineData(12000, 48000, 280)]
+    public void Calculate_AnyConsumption_TotalEqualsRoundedSubtotalPlusRoundedIgv(decimal kwhPeak,
+        decimal kwhOffPeak, decimal demand)
     {
-        var factura = TarifaMT2().Calcular(1000m, 2000m, 50m, 100m);
+        var factura = TarifaMT2().Calcular(kwhPeak, kwhOffPeak, demand, potenciaContratadaKw: 120m);
 
-        Assert.Equal(factura.CostoEnergia + factura.CostoPotencia + factura.CargoFijo,
-            factura.Subtotal);
-        Assert.Equal(Math.Round(factura.Subtotal * 0.18m, 2, MidpointRounding.AwayFromZero),
-            factura.Igv);
         Assert.Equal(factura.Subtotal + factura.Igv, factura.Total);
+        Assert.Equal(Math.Round(factura.Subtotal, 2), factura.Subtotal);
+        Assert.Equal(Math.Round(factura.Igv, 2), factura.Igv);
     }
 
     [Fact]
-    public void Sin_demanda_registrada_no_se_cobra_potencia()
+    public void Calculate_OneKwhAtPeak_ShowsTheTotalAsTheSumOfItsParts()
     {
-        // Un local recien dado de alta todavia no tiene lecturas. Cobrarle
-        // potencia sobre una demanda de cero seria inventarse un cargo.
-        var factura = TarifaMT2().Calcular(0m, 0m, demandaMaximaKw: 0m,
-            potenciaContratadaKw: 120m);
+        var factura = TarifaMT2().Calcular(1m, 0m, 0m, 120m);
 
-        Assert.Equal(0m, factura.CostoPotencia);
+        Assert.Equal(13.08m, factura.Subtotal);
+        Assert.Equal(2.35m, factura.Igv);
+        Assert.Equal(15.43m, factura.Total);
+    }
+
+    [Fact]
+    public void Calculate_Section526Example_ReturnsTheDocumentedBreakdown()
+    {
+        // Local en MT2 con 250 kW contratados, 12 000 kWh en punta, 48 000 fuera
+        // de punta y una demanda maxima de 280 kW.
+        var factura = TarifaMT2().Calcular(12000m, 48000m, 280m, 250m);
+
+        Assert.Equal(14868.00m, factura.CostoEnergia);
+        Assert.Equal(17228.00m, factura.CostoPotencia);
+        Assert.Equal(32108.80m, factura.Subtotal);
+        Assert.Equal(5779.58m, factura.Igv);
+        Assert.Equal(37888.38m, factura.Total);
+        Assert.Equal(53.7m, factura.PesoDeLaPotencia);
     }
 }

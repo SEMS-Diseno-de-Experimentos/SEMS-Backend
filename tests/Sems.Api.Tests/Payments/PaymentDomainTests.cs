@@ -2,10 +2,12 @@ using Sems.Api.Modules.Payments.Domain.Model;
 using Sems.Api.Shared.Errors;
 using Xunit;
 
-namespace Sems.Api.Tests;
+namespace Sems.Api.Tests.Payments;
 
 /// <summary>
-/// Reglas del modulo de pagos que no dependen de Stripe ni de la base de datos.
+/// <see cref="Money"/>, <see cref="Payment"/>, <see cref="Invoice"/> y
+/// <see cref="PaymentWebhookEvent"/>: las reglas que no dependen de Stripe ni de
+/// la base de datos.
 ///
 /// <para>Son las que mas caro cuestan si se rompen: un importe negativo aceptado
 /// o un cobro que salta de pendiente a pagado sin pasar por el proveedor son
@@ -13,17 +15,17 @@ namespace Sems.Api.Tests;
 /// </summary>
 public class PaymentDomainTests
 {
-    [Fact]
-    public void Un_importe_no_positivo_se_rechaza()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    public void Money_NonPositiveAmount_ThrowsValidationError(double amount)
     {
         Assert.Equal(ErrorCode.VALIDATION_ERROR,
-            Assert.Throws<AppException>(() => new Money(0, "pen")).Code);
-        Assert.Equal(ErrorCode.VALIDATION_ERROR,
-            Assert.Throws<AppException>(() => new Money(-5, "pen")).Code);
+            Assert.Throws<AppException>(() => new Money(amount, "pen")).Code);
     }
 
     [Fact]
-    public void La_moneda_se_normaliza_a_minusculas_para_Stripe()
+    public void Money_Currency_IsNormalizedToLowercaseForStripe()
     {
         var money = new Money(29.9, "  PEN  ");
 
@@ -31,23 +33,27 @@ public class PaymentDomainTests
         Assert.Equal(29.9, money.Amount);
     }
 
-    [Fact]
-    public void Una_moneda_vacia_se_rechaza()
+    [Theory]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void Money_EmptyCurrency_ThrowsValidationError(string? currency)
     {
-        Assert.Throws<AppException>(() => new Money(10, "   "));
-        Assert.Throws<AppException>(() => new Money(10, null));
+        Assert.Equal(ErrorCode.VALIDATION_ERROR,
+            Assert.Throws<AppException>(() => new Money(10, currency)).Code);
     }
 
-    [Fact]
-    public void Stripe_cobra_en_centimos_no_en_soles()
+    [Theory]
+    [InlineData(29.90, 2990)]
+    [InlineData(79.90, 7990)]
+    [InlineData(0.05, 5)]
+    public void ToMinorUnits_AmountInSoles_ReturnsCentsForStripe(double amount, long cents)
     {
         // 29.90 soles son 2990 centimos. Redondear mal aqui cobra de menos o de mas.
-        Assert.Equal(2990, new Money(29.9, "pen").ToMinorUnits());
-        Assert.Equal(5, new Money(0.05, "pen").ToMinorUnits());
+        Assert.Equal(cents, new Money(amount, "pen").ToMinorUnits());
     }
 
     [Fact]
-    public void Un_pago_nace_pendiente_y_sin_fecha_de_cobro()
+    public void Create_NewPayment_StartsPendingWithoutPaymentDate()
     {
         var payment = Payment.Create(Guid.NewGuid(), Guid.NewGuid(), null, 29.9, "PEN", "card");
 
@@ -58,7 +64,7 @@ public class PaymentDomainTests
     }
 
     [Fact]
-    public void Solo_al_completarse_se_sella_la_fecha_de_cobro()
+    public void MarkProcessed_AfterProcessing_OnlyThenStampsThePaymentDate()
     {
         var payment = Payment.Create(null, Guid.NewGuid(), null, 59.9, "pen", "card");
 
@@ -73,20 +79,36 @@ public class PaymentDomainTests
         Assert.Equal("pi_test_123", payment.StripePaymentIntentId);
     }
 
-    [Fact]
-    public void Un_pago_fallido_no_cuenta_como_pagado()
+    [Theory]
+    [InlineData(PaymentStatus.failed)]
+    [InlineData(PaymentStatus.cancelled)]
+    public void MarkFailedOrCancelled_Payment_DoesNotCountAsPaid(PaymentStatus outcome)
     {
         var payment = Payment.Create(null, Guid.NewGuid(), null, 10, "pen", "card");
 
-        payment.MarkFailed("pi_test_fail");
+        if (outcome == PaymentStatus.failed)
+        {
+            payment.MarkFailed("pi_test_fail");
+        }
+        else
+        {
+            payment.MarkCancelled("pi_test_fail");
+        }
 
-        Assert.Equal(PaymentStatus.failed, payment.Status);
+        Assert.Equal(outcome, payment.Status);
         Assert.False(payment.IsPaid);
         Assert.Null(payment.PaidAt);
     }
 
     [Fact]
-    public void El_evento_del_webhook_nace_sin_procesar()
+    public void Create_InvalidAmount_ThrowsValidationErrorBeforeCreatingThePayment()
+    {
+        Assert.Equal(ErrorCode.VALIDATION_ERROR, Assert.Throws<AppException>(() =>
+            Payment.Create(null, Guid.NewGuid(), null, 0, "pen", "card")).Code);
+    }
+
+    [Fact]
+    public void Received_WebhookEvent_StartsUnprocessedUntilMarked()
     {
         // Es lo que permite detectar reenvios: Stripe reintenta los webhooks y sin
         // este registro un mismo cobro se contabilizaria dos veces.
@@ -103,7 +125,7 @@ public class PaymentDomainTests
     }
 
     [Fact]
-    public void El_comprobante_lleva_la_fecha_en_su_numero()
+    public void IssueFor_Payment_CarriesTheDateInItsNumber()
     {
         var invoice = Invoice.IssueFor(Guid.NewGuid(), 29.9, null);
 

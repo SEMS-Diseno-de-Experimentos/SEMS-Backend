@@ -5,7 +5,7 @@ using Sems.Api.Modules.Iam.Domain.Repositories;
 using Sems.Api.Shared.Errors;
 using Xunit;
 
-namespace Sems.Api.Tests;
+namespace Sems.Api.Tests.Iam;
 
 /// <summary>
 /// Garantias de seguridad de los tokens opacos.
@@ -34,7 +34,7 @@ public class AuthTokenServiceTests
     }
 
     [Fact]
-    public async Task El_token_nunca_se_guarda_en_claro()
+    public async Task IssueRefreshTokenAsync_AnyUser_StoresItsSha256HashNeverTheRawValue()
     {
         var userId = Guid.NewGuid();
 
@@ -47,7 +47,7 @@ public class AuthTokenServiceTests
     }
 
     [Fact]
-    public async Task Dos_emisiones_seguidas_no_repiten_el_valor()
+    public async Task IssueRefreshTokenAsync_TwoConsecutiveIssues_ReturnDifferentValues()
     {
         var userId = Guid.NewGuid();
 
@@ -58,7 +58,7 @@ public class AuthTokenServiceTests
     }
 
     [Fact]
-    public async Task Refrescar_rota_el_token_usado()
+    public async Task ConsumeRefreshTokenAsync_UsedToken_RotatesItAndRejectsTheSecondUse()
     {
         var userId = Guid.NewGuid();
         var raw = await _service.IssueRefreshTokenAsync(userId);
@@ -73,7 +73,7 @@ public class AuthTokenServiceTests
     }
 
     [Fact]
-    public async Task Un_token_de_refresco_desconocido_se_rechaza()
+    public async Task ConsumeRefreshTokenAsync_UnknownToken_ThrowsUnauthorized()
     {
         var error = await Assert.ThrowsAsync<AppException>(
             () => _service.ConsumeRefreshTokenAsync("no-existe"));
@@ -82,7 +82,7 @@ public class AuthTokenServiceTests
     }
 
     [Fact]
-    public async Task Cerrar_sesion_sin_token_revoca_todas_las_del_usuario()
+    public async Task RevokeAsync_WithoutToken_RevokesEverySessionOfTheUser()
     {
         var userId = Guid.NewGuid();
         await _service.IssueRefreshTokenAsync(userId);
@@ -94,7 +94,20 @@ public class AuthTokenServiceTests
     }
 
     [Fact]
-    public async Task El_enlace_de_recuperacion_solo_sirve_una_vez()
+    public async Task RevokeAsync_WithToken_RevokesOnlyThatSession()
+    {
+        var userId = Guid.NewGuid();
+        var closed = await _service.IssueRefreshTokenAsync(userId);
+        var open = await _service.IssueRefreshTokenAsync(userId);
+
+        await _service.RevokeAsync(userId, closed);
+
+        await Assert.ThrowsAsync<AppException>(() => _service.ConsumeRefreshTokenAsync(closed));
+        Assert.Equal(userId, await _service.ConsumeRefreshTokenAsync(open));
+    }
+
+    [Fact]
+    public async Task ConsumeSingleUseAsync_PasswordResetLink_WorksOnlyOnce()
     {
         var userId = Guid.NewGuid();
         var raw = await _service.IssuePasswordResetTokenAsync(userId);
@@ -109,17 +122,35 @@ public class AuthTokenServiceTests
     }
 
     [Fact]
-    public async Task Un_token_no_sirve_para_un_proposito_distinto()
+    public async Task ConsumeSingleUseAsync_VerificationTokenUsedAsResetLink_IsRejected()
     {
         var userId = Guid.NewGuid();
         var raw = await _service.IssueVerificationTokenAsync(userId);
 
         // Verificar la cuenta no puede convertirse en cambiar la contrasena.
-        await Assert.ThrowsAsync<AppException>(
+        var error = await Assert.ThrowsAsync<AppException>(
             () => _service.ConsumeSingleUseAsync(raw, UserAuthToken.PurposePasswordReset));
+        Assert.Equal(ErrorCode.UNAUTHORIZED, error.Code);
 
         var owner = await _service.ConsumeSingleUseAsync(raw, UserAuthToken.PurposeVerification);
         Assert.Equal(userId, owner);
+    }
+
+    [Fact]
+    public async Task IssuePasswordResetTokenAsync_WithCallback_HandsTheRawValueBeforeSavingIt()
+    {
+        string? handed = null;
+        var savedBeforeCallback = true;
+
+        var raw = await _service.IssuePasswordResetTokenAsync(Guid.NewGuid(), value =>
+        {
+            handed = value;
+            savedBeforeCallback = _authTokens.Items.Count > 0;
+        });
+
+        Assert.Equal(raw, handed);
+        Assert.False(savedBeforeCallback);
+        Assert.Single(_authTokens.Items);
     }
 
     // ------------------------------------------------------- dobles de prueba
