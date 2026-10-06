@@ -1,0 +1,2366 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Sems.Api</name>
+    </assembly>
+    <members>
+        <member name="T:Sems.Api.Modules.Alerts.Application.AlertCommandService">
+            <summary>Casos de uso que modifican el estado del modulo de alertas.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Application.AlertCommandService.EvaluateDemandAsync(System.Guid,System.Double,System.Threading.CancellationToken)">
+             <summary>
+             Evalua una demanda medida contra las reglas del local y levanta la alerta
+             que corresponda.
+             </summary>
+             <remarks>
+             <para>Se levanta una alerta por regla incumplida, no una por local: un
+             local puede tener una regla estricta para el turno de noche y otra mas
+             laxa para el dia.</para>
+            
+             <para>La severidad distingue los dos casos porque la accion del cliente
+             es distinta: con WARNING todavia puede apagar algo y evitar el recargo;
+             con EXCEEDED el cargo del mes ya esta hecho y lo unico util es que no se
+             repita.</para>
+             </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Application.AlertCommandService.CreatePreferenceAsync(System.Guid,System.String,System.Boolean,System.String,System.Nullable{System.DateTime},System.Nullable{System.DateTime},System.Threading.CancellationToken)">
+            <summary>Repetir el canal actualiza la preferencia en vez de duplicarla.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Application.AlertQueryService">
+            <summary>Consultas del modulo de alertas.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Application.UserRegisteredHandler">
+             <summary>
+             Convierte eventos de dominio en correos al usuario.
+            
+             <para>Sustituye al consumidor de Kafka del servicio de alertas. Cada clase
+             escucha un tipo de evento en lugar de un topic, y el bus solo las invoca
+             despues de que la transaccion que origino el evento haya confirmado.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Application.VerificationRequestedHandler">
+             <summary>
+             Codigo de verificacion de cuenta.
+            
+             <para>El token llega en el evento y no se vuelve a consultar: quien lo emitio
+             es el unico que lo conoce en claro, ya que en base de datos se guarda su
+             resumen.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Application.PaymentProcessedHandler">
+            <summary>Comprobante de pago. El correo se resuelve preguntando a IAM.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Application.AlertTriggeredHandler">
+            <summary>Alerta de consumo disparada por un umbral o una regla de inactividad.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Application.ReadingProcessedHandler">
+             <summary>
+             Evalua los umbrales cada vez que llega una lectura.
+            
+             <para>Sustituye al consumidor del topic <c>energy.events</c>. Si alguna regla
+             activa del dispositivo se rompe, levanta la alerta correspondiente.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Application.AppUrl">
+            <summary>URL publica del frontend, usada en los enlaces de los correos.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Application.NotificationService">
+             <summary>
+             Envio de correo con reintentos y registro.
+            
+             <para>Reemplaza al <c>sendWithRetry</c> escrito a mano en Go: aqui los tres
+             intentos con espera creciente los aporta Polly, y solo cuando se agotan se
+             deja el fallo asentado en la bitacora.</para>
+            
+             <para>Un correo que no sale <b>nunca</b> debe tumbar la operacion de negocio
+             que lo origino: el cobro ya ocurrio aunque el comprobante no llegue. Por eso
+             el fallo definitivo se registra y se calla.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.Operator">
+             <summary>
+             Comparador de un umbral.
+            
+             <para>Se serializa con el simbolo (<c>"&gt;"</c>, <c>"&gt;="</c>...), igual que
+             en el servicio original, porque es lo que el usuario elige en la interfaz.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Model.OperatorExtensions.Test(Sems.Api.Modules.Alerts.Domain.Model.Operator,System.Double,System.Double)">
+            <summary>Aplica la comparacion. Es el corazon de la evaluacion de umbrales.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.OperatorJsonConverter">
+            <summary>Serializa el operador como su simbolo, no como el nombre del enum.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.Alert">
+            <summary>Aviso generado para un usuario sobre uno de sus dispositivos.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Model.Alert.UpdateStatus(System.String,System.Nullable{System.DateTime})">
+            <summary>Al pasar a resuelta se sella la fecha si el cliente no la envio.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.AlertThreshold">
+            <summary>Regla que dispara una alerta cuando una metrica cruza un valor.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Model.AlertThreshold.IsBreachedBy(System.Double)">
+            <summary>Decide si una lectura rompe este umbral.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.InactivityRule">
+            <summary>Regla que avisa cuando un dispositivo lleva demasiado tiempo sin reportar.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Model.InactivityRule.IsInactive(System.Nullable{System.DateTime},System.DateTime)">
+            <summary>
+            Un umbral de cero o negativo desactiva la regla en la practica: sin esa
+            guarda, cualquier dispositivo estaria siempre inactivo.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.NotificationPreference">
+            <summary>Preferencia de notificacion por canal de un usuario.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.NotificationLog">
+             <summary>
+             Registro de cada notificacion enviada.
+            
+             <para>Es la evidencia del requisito de trazabilidad de notificaciones: queda
+             constancia del canal, el destinatario, si salio bien y, si no, por que.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.DemandLevel">
+            <summary>Que tan cerca esta la demanda de la potencia contratada.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Alerts.Domain.Model.DemandLevel.OK">
+            <summary>Por debajo del aviso. No hay nada que decir.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Alerts.Domain.Model.DemandLevel.WARNING">
+            <summary>Se acerca a lo contratado. Aun se puede evitar el recargo.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Alerts.Domain.Model.DemandLevel.EXCEEDED">
+            <summary>Ya lo supero. El recargo del mes esta hecho.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Model.DemandRule">
+             <summary>
+             Regla que vigila la demanda de un local contra su potencia contratada.
+             </summary>
+             <remarks>
+             <para>Es la alerta que no tenia sentido en el segmento residencial: una
+             vivienda no paga por potencia, asi que su pico de demanda no le cuesta
+             dinero. Un local si, y ademas de una forma cruel: el pico mas alto del mes
+             fija el cargo de los treinta dias, aunque haya durado quince minutos.</para>
+            
+             <para>Por eso el aviso llega <b>antes</b> de superar lo contratado y no
+             despues: una vez superado, el recargo del mes ya esta hecho y avisar solo
+             sirve para dar la mala noticia. Con margen, en cambio, todavia se puede
+             apagar algo o retrasar el arranque de un equipo.</para>
+             </remarks>
+        </member>
+        <member name="P:Sems.Api.Modules.Alerts.Domain.Model.DemandRule.ContractedPowerKw">
+            <summary>Potencia contratada del local, en kW.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Alerts.Domain.Model.DemandRule.WarningPercent">
+            <summary>Porcentaje de lo contratado a partir del cual se avisa.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Alerts.Domain.Model.DemandRule.UmbralDeAvisoKw">
+            <summary>Demanda a la que se dispara el aviso, en kW.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Model.DemandRule.Evaluar(System.Double)">
+            <summary>En que nivel cae una demanda medida.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Model.DemandRule.MargenKw(System.Double)">
+            <summary>Cuantos kW quedan hasta superar lo contratado. Negativo si ya se supero.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Repositories.IAlertRepository">
+            <summary>Puertos de salida del modulo de alertas.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Repositories.IThresholdRepository.FindActiveByDeviceIdAsync(System.Nullable{System.Guid},System.Threading.CancellationToken)">
+            <summary>Umbrales activos de un dispositivo; los usa la evaluacion automatica.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Repositories.IDemandRuleRepository.FindActiveBySiteIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Reglas activas de un local; las usa la evaluacion de demanda.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Domain.Services.IEmailSender">
+             <summary>
+             Puerto de envio de correo.
+            
+             <para>El dominio no sabe si detras hay Gmail, un servicio transaccional o un
+             doble de pruebas. Eso permite probar el flujo de notificaciones sin enviar
+             correos de verdad.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Domain.Services.IEmailSender.SendAsync(System.String,System.String,System.String,System.Threading.CancellationToken)">
+            <exception cref="T:System.Exception">si el envio falla; quien llama decide si reintenta</exception>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Infrastructure.SmtpEmailSender">
+             <summary>
+             Envio de correo por SMTP.
+            
+             <para>El interruptor <c>Mail:Enabled</c> permite desactivar el envio en
+             desarrollo sin tocar codigo: el mensaje se registra en el log en lugar de
+             salir.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Interfaces.AlertController">
+             <summary>
+             API REST del bounded context de alertas.
+            
+             <para>Rutas identicas a las del microservicio en Go bajo <c>/api/v1</c>.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.Create(Sems.Api.Modules.Alerts.Interfaces.AlertResources.CreateAlertRequest)">
+            <summary>Creates an alert.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.All">
+            <summary>Lists every alert.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.ById(System.Guid)">
+            <summary>Gets an alert by its identifier.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.UpdateStatus(System.Guid,Sems.Api.Modules.Alerts.Interfaces.AlertResources.UpdateAlertStatusRequest)">
+            <summary>Changes the status of an alert.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.ByUser(System.Guid)">
+            <summary>Alerts for a user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.CreateThreshold(Sems.Api.Modules.Alerts.Interfaces.AlertResources.CreateThresholdRequest)">
+            <summary>Creates a consumption threshold.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.ThresholdsByUser(System.Guid)">
+            <summary>A user's thresholds.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.CreateRule(Sems.Api.Modules.Alerts.Interfaces.AlertResources.CreateInactivityRuleRequest)">
+            <summary>Creates an inactivity rule.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.RulesByUser(System.Guid)">
+            <summary>A user's inactivity rules.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.CreatePreference(Sems.Api.Modules.Alerts.Interfaces.AlertResources.CreatePreferenceRequest)">
+            <summary>Saves a notification preference.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.PreferencesByUser(System.Guid)">
+            <summary>A user's notification preferences.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.CreateDemandRule(Sems.Api.Modules.Alerts.Interfaces.AlertResources.CreateDemandRuleRequest)">
+            <summary>Creates a demand-watch rule for a site.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.DemandRulesBySite(System.Guid)">
+            <summary>Active demand rules for a site.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Alerts.Interfaces.AlertController.EvaluateDemand(System.Guid,Sems.Api.Modules.Alerts.Interfaces.AlertResources.EvaluateDemandRequest)">
+            <summary>
+            Evaluates a measured demand against the site rules and raises the
+            corresponding alerts.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Alerts.Interfaces.AlertResources">
+            <summary>JSON contract of the alerts module, in snake_case as in the original service.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Application.AnalyticsService">
+             <summary>
+             Casos de uso del modulo de analitica.
+            
+             <para>Comandos y consultas conviven aqui porque el contexto es pequenio:
+             cinco agregados con operaciones de crear, listar y cerrar. Separarlos en dos
+             servicios anadiria ceremonia sin aportar claridad.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Application.AnalyticsService.ForecastSiteBillAsync(System.String,System.String,System.String,System.Double,System.Int32,System.Int32,System.DateTime,System.DateTime,System.Double,System.Double,System.Double,System.Double,System.Threading.CancellationToken)">
+            <summary>
+            Calcula y guarda la proyeccion de recibo de un local con la tarifa
+            comercial vigente.
+            </summary>
+            <remarks>
+            A diferencia de <see cref="M:Sems.Api.Modules.Analytics.Application.AnalyticsService.CreatePredictionAsync(System.String,System.Int32,System.Int32,System.DateTime,System.DateTime,System.Double,System.Double,System.String,System.Double,System.Double,System.Threading.CancellationToken)"/>, aqui el importe no
+            lo trae quien llama: se calcula. Es lo que permite que la proyeccion
+            refleje el cargo por potencia, que en un local puede ser la mitad de la
+            factura y con la tarifa plana anterior no aparecia por ningun lado.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Model.RankingItem">
+             <summary>
+             Una posicion del ranking de consumo por dispositivo.
+            
+             <para>Value object inmutable. Se persiste embebido dentro del ranking, igual
+             que en el documento de MongoDB del servicio original.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Domain.Model.RankingItem.#ctor(System.Int32,System.String,System.String,System.Double,System.Double,System.Double,System.String)">
+             <summary>
+             Una posicion del ranking de consumo por dispositivo.
+            
+             <para>Value object inmutable. Se persiste embebido dentro del ranking, igual
+             que en el documento de MongoDB del servicio original.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Model.BillPrediction">
+            <summary>Proyeccion del recibo de un periodo, calculada a partir del historial.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Analytics.Domain.Model.BillPrediction.SiteId">
+            <summary>Local al que corresponde la prediccion. Vacio en las heredadas.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Analytics.Domain.Model.BillPrediction.EstimatedMaxDemandKw">
+            <summary>Demanda maxima prevista, en kW. Es la que fija el cargo por potencia.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Model.Recommendation">
+            <summary>Consejo de ahorro generado para el usuario.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Domain.Model.Recommendation.Apply">
+            <summary>Marcar como aplicada es idempotente: repetirlo no cambia la fecha original.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Model.Anomaly">
+            <summary>Comportamiento de consumo que se aparta de lo esperado.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Model.DeviceIdentificationResult">
+            <summary>
+            Resultado de inferir que tipo de aparato es un dispositivo a partir de su
+            patron de consumo.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Model.ConsumptionRanking">
+            <summary>Ordenacion de los dispositivos de un usuario por consumo en un periodo.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Analytics.Domain.Model.ConsumptionRanking.RankingsJson">
+            <summary>
+            Las posiciones se guardan como JSON en una sola columna, replicando el
+            documento anidado de MongoDB. Se consultan siempre completas, nunca por
+            posicion suelta, asi que normalizarlas en otra tabla no aportaria nada.
+            </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Domain.Model.ConsumptionRanking.Rankings">
+            <summary>Una fila con JSON corrupto devuelve un ranking vacio, no una excepcion.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Repositories.IBillPredictionRepository">
+             <summary>
+             Puertos de salida del modulo de analitica.
+            
+             <para>Los cinco agregados de este contexto se leen siempre igual: por usuario
+             y de lo mas reciente a lo mas antiguo.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Services.EstimatedBill">
+            <summary>Importe estimado de un recibo, desglosado.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Domain.Services.EstimatedBill.#ctor(System.Double,System.Double,System.Double,System.Double,System.String,System.Double)">
+            <summary>Importe estimado de un recibo, desglosado.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Domain.Services.IBillCalculator">
+            <summary>
+            Lo unico que la analitica necesita de las tarifas.
+            </summary>
+            <remarks>
+            La analitica no tiene por que saber que existe una hora punta, un cargo por
+            exceso ni el IGV: solo necesita convertir un consumo previsto en un importe.
+            Ese calculo vive en el modulo de energia, que es su dueno, y aqui solo entra
+            el resultado.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Infrastructure.EnergyBillCalculator">
+            <summary>
+            Resuelve <see cref="T:Sems.Api.Modules.Analytics.Domain.Services.IBillCalculator"/> delegando en el modulo de energia.
+            </summary>
+            <remarks>
+            La dependencia entre modulos queda aqui, en infraestructura, y en una sola
+            direccion: analitica conoce a energia, nunca al reves.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController">
+             <summary>
+             API REST del bounded context de analitica.
+            
+             <para>Rutas identicas a las del microservicio en FastAPI, bajo el prefijo
+             <c>/api/v1/analytics</c>. El frontend consume sobre todo
+             <c>/bill-predictions/user/{id}</c> y <c>/consumption-rankings/user/{id}</c>.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.Predictions(System.String)">
+            <summary>A user's bill forecasts.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.CreatePrediction(Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources.CreatePredictionRequest)">
+            <summary>Records a bill forecast.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.ForecastSiteBill(Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources.ForecastSiteBillRequest)">
+            <summary>
+            Forecasts a site's bill using the commercial tariff, including the
+            power charge.
+            </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.Recommendations(System.String)">
+            <summary>A user's saving recommendations.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.CreateRecommendation(Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources.CreateRecommendationRequest)">
+            <summary>Records a recommendation.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.ApplyRecommendation(System.Guid)">
+            <summary>Marks a recommendation as applied.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.Anomalies(System.String)">
+            <summary>Anomalies detected for a user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.CreateAnomaly(Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources.CreateAnomalyRequest)">
+            <summary>Records an anomaly.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.ResolveAnomaly(System.Guid)">
+            <summary>Marks an anomaly as resolved.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.Identifications(System.String)">
+            <summary>Appliance identifications for a user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.CreateIdentification(Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources.CreateIdentificationRequest)">
+            <summary>Records an appliance identification.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.Rankings(System.String)">
+            <summary>A user's consumption rankings.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsController.CreateRanking(Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources.CreateRankingRequest)">
+            <summary>Records a consumption ranking.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources">
+             <summary>
+             Contrato JSON del modulo de analitica.
+            
+             <para>Como el resto de lo que venia de FastAPI, se serializa en snake_case y
+             cada campo lo declara explicitamente.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources.ForecastSiteBillRequest">
+            <summary>Bill forecast request for a site.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources.ForecastSiteBillRequest.#ctor(System.String,System.String,System.String,System.Double,System.Int32,System.Int32,System.DateTime,System.DateTime,System.Double,System.Double,System.Double,System.Double)">
+            <summary>Bill forecast request for a site.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Application.DeviceCommandService">
+             <summary>
+             Casos de uso que modifican el estado del modulo de dispositivos.
+            
+             <para>Orquesta agregados y repositorios, pero no contiene reglas de negocio:
+             esas viven en el dominio. Publica eventos al bus para que otros modulos
+             reaccionen, igual que el servicio original publicaba a los topics de
+             Kafka.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Application.DeviceCommandService.ValidarUbicacionAsync(System.Guid,System.Nullable{System.Guid},System.Threading.CancellationToken)">
+            <summary>Comprueba que el local existe y que la zona es suya.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Application.DeviceCommandService.RemoveAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Borrado logico: el dispositivo pasa a REMOVED y deja de listarse.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Application.DeviceCommandService.UpsertConfigurationAsync(System.Guid,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Si la clave ya existe para ese dispositivo, se actualiza su valor.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Application.DeviceQueryService">
+            <summary>Casos de uso de solo lectura del modulo de dispositivos.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Application.DeviceQueryService.DevicesBySiteAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Dispositivos instalados en un local.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Application.DeviceQueryService.DevicesByZoneAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Dispositivos de una zona concreta.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Model.Device">
+             <summary>
+             Raiz del agregado Device.
+            
+             <para>Toda modificacion pasa por sus metodos, de modo que las reglas de
+             negocio no se pueden saltar: el estado invalido no es representable desde
+             fuera del agregado. Los <c>private set</c> son lo que sostiene esa
+             garantia.</para>
+             </summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Devices.Domain.Model.Device.SiteId">
+            <summary>Local en el que esta instalado. Obligatorio.</summary>
+            <remarks>
+            El medidor, el contrato y la factura son del local, no de la persona.
+            Sin este dato no se puede saber a que suministro imputar el consumo, que
+            es justo lo que se hace con el en el segmento de establecimientos.
+            </remarks>
+        </member>
+        <member name="P:Sems.Api.Modules.Devices.Domain.Model.Device.ZoneId">
+            <summary>Zona concreta dentro del local. Opcional.</summary>
+            <remarks>
+            Se admite vacia porque al dar de alta un local puede que aun no esten
+            definidas las zonas, y bloquear el alta del medidor por eso seria
+            molesto. En cuanto existe, permite separar el consumo de las camaras del
+            de la sala de ventas.
+            </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.Device.#ctor">
+            <summary>Constructor sin argumentos que exige EF Core al rehidratar.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.Device.Register(System.String,System.Guid,System.Guid,System.Nullable{System.Guid},System.String,System.String,System.String,System.String,Sems.Api.Modules.Devices.Domain.Model.ConnectionProtocol)">
+            <summary>
+            Unica forma correcta de crear un dispositivo nuevo. Valida cada campo
+            obligatorio antes de construir, de modo que un Device recien creado
+            siempre es valido.
+            </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.Device.UpdateDetails(System.String,System.String,System.String,System.String,Sems.Api.Modules.Devices.Domain.Model.ConnectionProtocol,System.Nullable{System.Guid})">
+            <summary>Un dispositivo eliminado queda congelado y ya no admite ediciones.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.Device.ChangeStatus(Sems.Api.Modules.Devices.Domain.Model.DeviceStatus)">
+            <summary>La transicion la decide el value object, no el agregado.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.Device.Remove">
+            <summary>Borrado logico: la fila permanece, solo cambia el estado.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.Device.NormalizeOptional(System.String)">
+            <summary>Trata "en blanco" y "no informado" como lo mismo: ausencia de valor.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Model.DeviceBinding">
+            <summary>Vinculo entre un dispositivo y la persona que lo opera, en un local.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.DeviceBinding.Unlink">
+            <summary>Desvincular dos veces es un conflicto, no una operacion idempotente.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Model.DeviceConfiguration">
+            <summary>Ajuste con nombre asociado a un dispositivo.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Model.DeviceEvent">
+            <summary>Hecho registrado en la vida de un dispositivo.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Devices.Domain.Model.DeviceEvent.AllowedTypes">
+            <summary>Mismo conjunto cerrado que validaba el servicio en Go.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Model.DeviceStatus">
+             <summary>
+             Estado de un dispositivo.
+            
+             <para>Un enum da la misma garantia que en Go se lograba con un tipo string
+             con nombre: el compilador impide pasar cualquier cadena donde se espera un
+             estado.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Model.BindingStatus">
+            <summary>Estado del vinculo entre un dispositivo y quien lo opera.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Model.ConnectionProtocol">
+            <summary>Protocolo por el que el dispositivo se comunica.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.DeviceEnums.ToDeviceStatus(System.String)">
+            <summary>Convierte texto no confiable en un estado valido.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Model.DeviceEnums.CanTransitionTo(Sems.Api.Modules.Devices.Domain.Model.DeviceStatus,Sems.Api.Modules.Devices.Domain.Model.DeviceStatus)">
+            <summary>
+            Maquina de estados del dispositivo. El orden de las reglas importa:
+            <list type="number">
+              <item>REMOVED es terminal: de ahi no se sale.</item>
+              <item>Cualquier dispositivo vivo puede pasar a REMOVED.</item>
+              <item>El resto de transiciones solo valen entre estados vivos.</item>
+            </list>
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Repositories.IDeviceRepository">
+             <summary>
+             Puertos de salida del modulo de dispositivos.
+            
+             <para>Declarados en el dominio y hablados en objetos de dominio: la capa de
+             aplicacion no sabe si detras hay EF Core, un documento o una llamada
+             remota.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Repositories.IDeviceRepository.FindBySiteIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Dispositivos vigentes instalados en un local.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Repositories.IDeviceRepository.FindByZoneIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Dispositivos vigentes de una zona concreta.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Repositories.IDeviceRepository.CountBySiteIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Cuantos dispositivos vigentes tiene el local. Lo usan los limites de plan.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Repositories.IDeviceBindingRepository.FindActiveByDeviceIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Un dispositivo no puede tener dos vinculos activos a la vez.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Repositories.IDeviceEventRepository.FindByDeviceIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Ordenados del mas reciente al mas antiguo.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Domain.Services.ISiteDirectory">
+             <summary>
+             Lo unico que el modulo de dispositivos necesita saber sobre locales y zonas.
+             </summary>
+             <remarks>
+             <para>Es un puerto y no una llamada directa al modulo de organizaciones a
+             proposito. Dispositivos no tiene por que conocer que es una organizacion, ni
+             una categoria tarifaria, ni un vinculo de acceso: solo necesita responder a
+             dos preguntas antes de dar de alta un equipo.</para>
+            
+             <para>Declarar aqui esa frontera es lo que evita que un monolito modular se
+             convierta en una maranha donde cualquier modulo llama a cualquier otro.</para>
+             </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Services.ISiteDirectory.SiteIsActiveAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Si el local existe y esta vigente.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Domain.Services.ISiteDirectory.ZoneBelongsToSiteAsync(System.Guid,System.Guid,System.Threading.CancellationToken)">
+            <summary>Si la zona existe, esta vigente y pertenece a ese local.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Infrastructure.DeviceConfig">
+             <summary>
+             Mapeo a tablas del modulo de dispositivos.
+            
+             <para>Vive en infraestructura porque es un detalle de persistencia: el
+             dominio no debe depender de EF Core. El nombre de tabla lleva el prefijo
+             <c>dm_</c> para aislar el modulo dentro de la base compartida.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Infrastructure.DeviceRepository">
+            <summary>Implementacion del puerto sobre EF Core.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Infrastructure.DeviceRepository.FindByUserIdAsync(System.Guid,System.Threading.CancellationToken)">
+             <summary>Dispositivos vigentes del usuario. Los borrados no salen.</summary>
+             <remarks>
+             El borrado es logico: marca el dispositivo como REMOVED y conserva la
+             fila, porque de ella cuelgan las lecturas y el consumo historico.
+            
+             Pero conservar la fila no es motivo para seguir ensenandola. Si aparece
+             aqui, el usuario borra un dispositivo, desaparece de la pantalla y vuelve
+             al recargar; y ademas sigue ocupando cupo, asi que con el plan Free
+             (3 dispositivos) basta con dar de alta y borrar tres para quedarse sin
+             poder anadir ninguno mas, para siempre.
+             </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Infrastructure.OrganizationsSiteDirectory">
+            <summary>
+            Resuelve <see cref="T:Sems.Api.Modules.Devices.Domain.Services.ISiteDirectory"/> contra las tablas del modulo de
+            organizaciones.
+            </summary>
+            <remarks>
+            La dependencia hacia el otro modulo vive aqui, en infraestructura, que es la
+            capa a la que le corresponde conocer el mundo exterior. El dominio y la capa
+            de aplicacion de dispositivos siguen sin saber que existe una organizacion.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Interfaces.DeviceController">
+             <summary>
+             API REST del bounded context de dispositivos.
+            
+             <para>Las rutas son identicas a las del microservicio original bajo
+             <c>/api/v1/device-management</c>. Mantenerlas iguales es lo que permite
+             cambiar el backend sin tocar el frontend.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.Create(Sems.Api.Modules.Devices.Interfaces.DeviceResources.CreateDeviceRequest)">
+            <summary>Registers a new device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.List">
+            <summary>Lists every device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.ById(System.Guid)">
+            <summary>Gets a device by its identifier.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.ByUser(System.Guid)">
+            <summary>Lists a user's devices.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.BySite(System.Guid)">
+            <summary>Devices installed at a site.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.ByZone(System.Guid)">
+            <summary>Devices in a specific zone.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.Update(System.Guid,Sems.Api.Modules.Devices.Interfaces.DeviceResources.UpdateDeviceRequest)">
+            <summary>Updates the editable details of a device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.ParseOptionalId(System.String)">
+            <summary>Converts an optional identifier from the body into a Guid.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.ChangeStatus(System.Guid,Sems.Api.Modules.Devices.Interfaces.DeviceResources.UpdateDeviceStatusRequest)">
+            <summary>Changes the status of a device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceController.Remove(System.Guid)">
+            <summary>Deletes a device (soft delete).</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Interfaces.DeviceBindingController">
+            <summary>Binding of devices to the people who operate them.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceBindingController.Bind(System.Guid,Sems.Api.Modules.Devices.Interfaces.DeviceResources.CreateBindingRequest)">
+            <summary>Links a device to a user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceBindingController.ByDevice(System.Guid)">
+            <summary>Lists the bindings of a device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceBindingController.ByUser(System.Guid)">
+            <summary>Lists the bindings of a user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceBindingController.Unlink(System.Guid)">
+            <summary>Unlinks a device.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Interfaces.DeviceConfigurationController">
+            <summary>Named settings attached to a device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceConfigurationController.Upsert(System.Guid,Sems.Api.Modules.Devices.Interfaces.DeviceResources.CreateConfigurationRequest)">
+            <summary>Creates or updates a device setting.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceConfigurationController.ByDevice(System.Guid)">
+            <summary>Lists the settings of a device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceConfigurationController.Update(System.Guid,Sems.Api.Modules.Devices.Interfaces.DeviceResources.UpdateConfigurationRequest)">
+            <summary>Updates the value of a setting.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Interfaces.DeviceEventController">
+            <summary>Log of what happened to each device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceEventController.Create(System.Guid,Sems.Api.Modules.Devices.Interfaces.DeviceResources.CreateEventRequest)">
+            <summary>Records a device event.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Devices.Interfaces.DeviceEventController.ByDevice(System.Guid)">
+            <summary>Lists a device's events, newest first.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Devices.Interfaces.DeviceResources">
+             <summary>
+             Contrato JSON del modulo de dispositivos.
+            
+             <para>Los nombres replican exactamente los del servicio en Go, en camelCase.
+             El frontend no distingue si detras hay Go, Java o C#.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Application.EnergyCommandService">
+            <summary>Casos de uso que modifican el estado del modulo de energia.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Application.EnergyCommandService.RegisterMeterAsync(System.String,System.String,System.String,System.String,System.String,System.String,System.Nullable{System.Double},System.Threading.CancellationToken)">
+            <summary>Vincular dos veces el mismo numero de serie es un conflicto.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Application.EnergyCommandService.RecordReadingAsync(System.String,System.String,System.String,System.Double,System.Double,System.Double,System.Double,System.Double,System.Nullable{System.DateTime},System.String,System.String,System.Threading.CancellationToken)">
+             <summary>
+             Registra una lectura y avisa al resto del sistema.
+            
+             <para>El evento <c>ReadingProcessed</c> es el que consumen analytics para
+             rankings y proyecciones, y alerts para evaluar umbrales. Antes viajaba
+             por el topic <c>energy.events</c>.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Application.EnergyCommandService.CurrentTariff(System.String)">
+            <summary>Tarifa comercial vigente para una categoria del pliego.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Application.EnergyCommandService.EstimateBill(System.String,System.Decimal,System.Decimal,System.Decimal,System.Decimal)">
+            <summary>
+            Estima la factura del mes de un local a partir de su consumo por franja
+            y de la demanda maxima registrada.
+            </summary>
+            <remarks>
+            El local aporta la categoria tarifaria y la potencia contratada; energia
+            no los guarda ni los consulta, para no depender del modulo de
+            organizaciones. Es quien llama el que los trae.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Application.EnergyQueryService">
+            <summary>Casos de uso de solo lectura del modulo de energia.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.FranjaHoraria">
+            <summary>
+            Franja horaria de un consumo.
+            </summary>
+            <remarks>
+            En el segmento residencial no existia: una vivienda paga lo mismo a
+            cualquier hora. Un establecimiento en tarifa comercial no.
+            </remarks>
+        </member>
+        <member name="F:Sems.Api.Modules.Energy.Domain.Model.FranjaHoraria.PUNTA">
+            <summary>Hora punta.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Energy.Domain.Model.FranjaHoraria.FUERA_DE_PUNTA">
+            <summary>Fuera de punta.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.HorarioPunta">
+             <summary>
+             Reglas del horario de punta del sistema electrico peruano.
+             </summary>
+             <remarks>
+             <para>Segun el pliego tarifario (OSINERGMIN, Anexo B): <i>"Se entendera por horas
+             de punta (HP) el periodo comprendido entre las 18:00 horas y 23:00 horas de cada
+             dia de todos los meses del ano, exceptuandose a solicitud del cliente, los dias
+             domingos, dias de descanso que correspondan a feriados y feriados que coincidan
+             con dias de descanso"</i>.</para>
+            
+             <para>Conviene leer despacio la parte de "a solicitud del cliente": la hora punta
+             rige <b>todos los dias</b>, domingos incluidos. La exclusion de domingos y feriados
+             no es automatica, es una opcion que el cliente pide a la distribuidora. Por eso no
+             se puede codificar como si fuera universal: depende del contrato de cada suministro
+             y por eso llega como parametro.</para>
+            
+             <para>Para un supermercado la diferencia no es menor. El domingo es uno de sus dias
+             de mayor afluencia, y darlo por fuera de punta cuando no lo esta subestima la
+             factura justo en la franja mas cara.</para>
+             </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.HorarioPunta.FranjaDe(System.DateTime,System.Boolean)">
+             <summary>Franja a la que pertenece un instante.</summary>
+             <param name="instanteUtc">Momento de la lectura, en UTC.</param>
+             <param name="excluyeDomingos">
+             Si el suministro tiene concedida la exclusion de domingos y feriados. Por
+             defecto <c>false</c>, que es el caso general del pliego.
+             </param>
+             <remarks>
+             Se evalua en hora local de Peru, no en UTC. Las lecturas se guardan en UTC, y
+             Peru esta en UTC-5: sin convertir, un consumo de las 19:00 locales se
+             registraria como las 00:00 del dia siguiente y se facturaria como fuera de
+             punta, que es justo lo contrario de lo que es.
+            
+             Los feriados no se contemplan aqui: requieren el calendario oficial del ano, que
+             esta fuera del alcance de este modelo. Un suministro con la exclusion concedida
+             vera bien sus domingos y mal sus feriados; queda anotado como limitacion
+             conocida en vez de resolverse a medias.
+             </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.HorarioPunta.AHoraLocal(System.DateTime)">
+            <summary>Pasa un instante UTC a hora de Peru (UTC-5, sin horario de verano).</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.CommercialTariff">
+             <summary>
+             Tarifa electrica comercial: precios de energia por franja mas cargos por
+             potencia.
+             </summary>
+             <remarks>
+             <para>Es la diferencia de fondo con la tarifa de una vivienda, que solo
+             tenia un precio por kWh. Aqui la factura suma tres conceptos distintos y el
+             segundo, la potencia, no depende de cuanta energia se gasto sino de cual fue
+             el pico mas alto del mes.</para>
+            
+             <para>Los importes son referenciales y los entrega el adaptador del
+             proveedor: este tipo solo sabe combinarlos.</para>
+             </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.CommercialTariff.#ctor(System.String,System.String,System.String,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.DateTime)">
+             <summary>
+             Tarifa electrica comercial: precios de energia por franja mas cargos por
+             potencia.
+             </summary>
+             <remarks>
+             <para>Es la diferencia de fondo con la tarifa de una vivienda, que solo
+             tenia un precio por kWh. Aqui la factura suma tres conceptos distintos y el
+             segundo, la potencia, no depende de cuanta energia se gasto sino de cual fue
+             el pico mas alto del mes.</para>
+            
+             <para>Los importes son referenciales y los entrega el adaptador del
+             proveedor: este tipo solo sabe combinarlos.</para>
+             </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.CommercialTariff.CostoDeEnergia(System.Decimal,System.Decimal)">
+            <summary>Coste de la energia consumida, sin impuestos.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.CommercialTariff.CostoDePotencia(System.Decimal,System.Decimal)">
+            <summary>
+            Coste de la potencia del mes, sin impuestos.
+            </summary>
+            <remarks>
+            Se cobra sobre la demanda maxima registrada, y lo que exceda de la
+            potencia contratada se cobra ademas a precio de penalizacion. Un pico de
+            quince minutos encarece el mes entero: por eso conviene detectarlo y
+            avisar, no solo mostrar el consumo acumulado.
+            </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.CommercialTariff.Calcular(System.Decimal,System.Decimal,System.Decimal,System.Decimal)">
+            <summary>Desglose completo de la factura estimada.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.BillBreakdown">
+            <summary>
+            Desglose de la factura estimada de un local.
+            </summary>
+            <remarks>
+            Se devuelve entero, no solo el total, porque el valor para el cliente esta
+            en el desglose: ver que el cargo por potencia se come una parte de la
+            factura es lo que justifica actuar sobre los picos.
+            </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.BillBreakdown.#ctor(System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.String)">
+            <summary>
+            Desglose de la factura estimada de un local.
+            </summary>
+            <remarks>
+            Se devuelve entero, no solo el total, porque el valor para el cliente esta
+            en el desglose: ver que el cargo por potencia se come una parte de la
+            factura es lo que justifica actuar sobre los picos.
+            </remarks>
+        </member>
+        <member name="P:Sems.Api.Modules.Energy.Domain.Model.BillBreakdown.PesoDeLaPotencia">
+            <summary>Que porcentaje del subtotal se lleva la potencia.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Energy.Domain.Model.BillBreakdown.HayExcesoDePotencia">
+            <summary>Si se supero la potencia contratada.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.EnergyMeter">
+             <summary>
+             Medidor inteligente que pertenece a un usuario.
+            
+             <para>Representa el dispositivo fisico EOS que mide el consumo y produce las
+             lecturas.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.EnergyMeter.UpdateLastSeen">
+            <summary>Marca el instante en que el medidor reporto por ultima vez.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.EnergyReading">
+             <summary>
+             Una medicion enviada por un medidor en un instante concreto.
+            
+             <para>El conjunto de lecturas forma el historial con el que se calculan
+             consumos, proyecciones y alertas.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.EnergyReading.IsHighConsumption(System.Double)">
+            <summary>Umbral por defecto de 2 kW, el mismo del servicio original.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.EnergyReading.ToKwhRate">
+            <summary>Convierte la potencia instantanea en kWh por hora.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.DeviceConsumption">
+             <summary>
+             Resumen del consumo de un dispositivo en un periodo.
+            
+             <para>Guarda los numeros ya agregados para no recorrer miles de lecturas
+             sueltas cada vez que se consulta.</para>
+             </summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Energy.Domain.Model.DeviceConsumption.DefaultTariff">
+            <summary>Tarifa media de referencia en Peru, la misma del servicio original.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.ConsumptionAlert">
+             <summary>
+             Aviso generado cuando el consumo rompe una regla.
+            
+             <para>Guarda el limite que se vigilaba y el valor real que lo supero, de modo
+             que el mensaje al usuario pueda explicar por que salto.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.ConsumptionAlert.ExcessPercentage">
+            <summary>Cuanto se paso el valor real por encima del limite, en porcentaje.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.MeterStatus">
+             <summary>
+             Estado del medidor.
+            
+             <para>El servicio en Python serializaba estos valores en minusculas
+             (<c>"active"</c>, <c>"inactive"</c>...). El convertidor de abajo conserva ese
+             formato exacto para no romper al frontend.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.AlertType">
+            <summary>Motivo por el que se genero una alerta de consumo.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.AlertSeverity">
+            <summary>Urgencia de la alerta, de menor a mayor.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.PowerReading">
+             <summary>
+             Medicion electrica instantanea. Value object inmutable.
+            
+             <para>Las validaciones son las mismas que hacia <c>__post_init__</c> en
+             Python: ninguna magnitud puede ser negativa y la frecuencia tiene que estar
+             en el rango fisico de una red electrica.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.PowerReading.ApparentPowerVa">
+            <summary>Potencia aparente en voltiamperios.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.PowerReading.PowerFactor">
+            <summary>Factor de potencia, acotado a 1.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Model.EnergyPrice">
+            <summary>Precio de la electricidad publicado por el proveedor externo.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Model.EnergyPrice.#ctor(System.String,System.Double,System.String,System.DateTime)">
+            <summary>Precio de la electricidad publicado por el proveedor externo.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Repositories.IEnergyMeterRepository">
+            <summary>Puertos de salida del modulo de energia.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Repositories.IDeviceConsumptionRepository.FindTopByUserIdAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>Los mayores consumidores del usuario, de mayor a menor.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Domain.Services.IEnergyPricingProvider">
+             <summary>
+             Puerto hacia el proveedor externo de tarifas electricas.
+            
+             <para>El dominio solo conoce esta interfaz. Hoy detras hay un adaptador
+             simulado; manana puede haber una integracion real sin tocar nada mas.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Domain.Services.IEnergyPricingProvider.CurrentTariff(System.String)">
+            <summary>
+            Tarifa comercial vigente para una categoria del pliego.
+            </summary>
+            <remarks>
+            La categoria llega como texto y no como enum de otro modulo a proposito:
+            energia no debe depender del bounded context de organizaciones. Es quien
+            llama el que traduce, igual que ocurre con el tipo de dispositivo.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Infrastructure.EnergyReadingConfig">
+             <summary>
+             Lecturas del medidor. Sustituye a la coleccion de MongoDB.
+            
+             <para>Los indices compuestos por dispositivo y marca de tiempo son los que
+             sostienen las consultas de historial y de ultima lectura, que son las mas
+             frecuentes.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Infrastructure.MockPlusEnergiaAdapter">
+             <summary>
+             Adaptador simulado del proveedor ficticio Plus Energia.
+            
+             <para>Porta el comportamiento exacto del adaptador en Python: la semilla del
+             generador es la fecha del dia, de modo que el precio es aleatorio entre
+             usuarios pero <b>estable durante toda la jornada</b>. Sin esa semilla la
+             tarifa cambiaria en cada peticion y los costes mostrados al usuario
+             bailarian.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Infrastructure.MockPlusEnergiaAdapter.CurrentTariff(System.String)">
+             <summary>
+             Tarifa comercial simulada para la categoria pedida.
+             </summary>
+             <remarks>
+             <para>Los importes son <b>referenciales</b>, del mismo orden de magnitud
+             que los del pliego tarifario, pero no son los oficiales: este adaptador
+             simula al proveedor. Cuando se integre uno real, se sustituye esta clase
+             y no cambia nada mas, que es el motivo de que exista el puerto.</para>
+            
+             <para>BT5B es el caso aparte: es la tarifa sin cargo por potencia, la
+             misma que tendria una vivienda. Se mantiene porque un local pequeno puede
+             estar en ella, y devolver cargos de potencia en cero es mas honesto que
+             negarse a responder.</para>
+             </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Interfaces.EnergyMeterController">
+            <summary>Smart meters linked to each user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyMeterController.Register(Sems.Api.Modules.Energy.Interfaces.EnergyResources.RegisterMeterRequest)">
+            <summary>Registers a new meter.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyMeterController.ByUser(System.String)">
+            <summary>Lists a user's meters.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyMeterController.Deactivate(System.Guid)">
+            <summary>Deactivates a meter.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyMeterController.ById(System.Guid)">
+            <summary>Gets a meter by its identifier.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Interfaces.EnergyReadingController">
+            <summary>Individual readings sent by the meters.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyReadingController.Create(Sems.Api.Modules.Energy.Interfaces.EnergyResources.CreateReadingRequest)">
+            <summary>Records a new reading.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyReadingController.ByUser(System.String,System.Int32)">
+            <summary>A user's readings, newest first.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyReadingController.ByDevice(System.String,System.Int32,System.Int32)">
+            <summary>Readings from a device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyReadingController.ByRange(System.String,System.DateTime,System.DateTime)">
+            <summary>A user's readings within a date range.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyReadingController.LatestByMeter(System.String)">
+            <summary>Latest reading from a meter.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyReadingController.ById(System.Guid)">
+            <summary>Gets a reading by its identifier.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Interfaces.EnergyPricingController">
+             <summary>
+             Tarifa vigente y consumo por dispositivo.
+            
+             <para>La ruta <c>/api/v1/energy/pricing/current</c> es la que consulta el
+             frontend para convertir kWh en soles.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyPricingController.CurrentPricing">
+            <summary>Current electricity tariff.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyPricingController.CurrentTariff(System.String)">
+            <summary>Current commercial tariff for a category of the schedule.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyPricingController.EstimateBill(Sems.Api.Modules.Energy.Interfaces.EnergyResources.EstimateBillRequest)">
+            <summary>Estimates a site's monthly bill.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyPricingController.CurrentConsumption(System.String)">
+            <summary>Current consumption of a device.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyPricingController.ConsumptionHistory(System.String,System.Int32,System.Int32)">
+            <summary>Consumption history of a device.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Interfaces.DeviceConsumptionController">
+            <summary>Consumption summaries aggregated by device and period.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.DeviceConsumptionController.ByUser(System.String)">
+            <summary>A user's consumption summaries.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.DeviceConsumptionController.TopByUser(System.String,System.Int32)">
+            <summary>A user's highest-consuming devices.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.DeviceConsumptionController.ById(System.Guid)">
+            <summary>Gets a summary by its identifier.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Interfaces.ConsumptionAlertController">
+            <summary>Alerts raised by the monitoring module itself.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.ConsumptionAlertController.ByUser(System.String)">
+            <summary>Alerts for a user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.ConsumptionAlertController.UnreadByUser(System.String)">
+            <summary>Unread alerts for a user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.ConsumptionAlertController.ById(System.Guid)">
+            <summary>Gets an alert by its identifier.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.ConsumptionAlertController.MarkRead(System.Guid)">
+            <summary>Marks an alert as read.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.ConsumptionAlertController.Resolve(System.Guid)">
+            <summary>Marks an alert as resolved.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Interfaces.EnergyResources">
+             <summary>
+             Contrato JSON del modulo de energia.
+            
+             <para><b>Importante:</b> el servicio original estaba escrito en FastAPI y
+             serializaba en snake_case (<c>user_id</c>, <c>power_watts</c>,
+             <c>meter_serial</c>...). C# usa camelCase por convencion, asi que cada campo
+             declara su nombre real con <c>[JsonPropertyName]</c>. Sin eso el frontend
+             dejaria de encontrar los campos y las pantallas saldrian vacias.</para>
+            
+             <para>Se hace campo por campo a proposito: asi el contrato queda escrito en
+             el propio recurso y no depende de una convencion global que alguien pueda
+             cambiar sin darse cuenta.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Interfaces.EnergyResources.TariffResponse">
+            <summary>Commercial tariff: prices per time band and power charges.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyResources.TariffResponse.#ctor(System.String,System.String,System.String,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.String,System.Boolean,System.DateTime)">
+            <summary>Commercial tariff: prices per time band and power charges.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Energy.Interfaces.EnergyResources.BillEstimateResponse">
+            <summary>Breakdown of a site's estimated bill.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Energy.Interfaces.EnergyResources.BillEstimateResponse.#ctor(System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Boolean,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.Decimal,System.String)">
+            <summary>Breakdown of a site's estimated bill.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Application.SessionResult">
+            <summary>Sesion entregada tras autenticarse.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.SessionResult.#ctor(System.String,System.String,System.Guid,System.String,System.Collections.Generic.List{System.String})">
+            <summary>Sesion entregada tras autenticarse.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Application.AuthenticationService">
+             <summary>
+             Alta e inicio de sesion.
+            
+             <para>Orquesta repositorios, servicios de dominio y el publicador de eventos,
+             pero no contiene reglas de negocio: esas viven en el dominio.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AuthenticationService.BuildSessionAsync(Sems.Api.Modules.Iam.Domain.Model.User,System.Threading.CancellationToken)">
+            <summary>Arma el par de tokens y la respuesta de sesion para un usuario.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Application.AccountRecoveryService">
+             <summary>
+             Verificacion de cuenta, recuperacion de contrasena, refresco y cierre de sesion.
+            
+             <para>Se separa de <see cref="T:Sems.Api.Modules.Iam.Application.AuthenticationService"/> para que ese no siga
+             creciendo: alli viven el alta y el inicio de sesion; aqui, el ciclo de vida
+             de la credencial.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AccountRecoveryService.RefreshAsync(System.String,System.Threading.CancellationToken)">
+             <summary>
+             Entrega un par de tokens nuevo a partir de uno de refresco valido.
+            
+             <para>El de refresco se rota en el proceso: el anterior queda revocado.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AccountRecoveryService.LogoutAsync(System.Nullable{System.Guid},System.String,System.Threading.CancellationToken)">
+            <summary>Cierra la sesion. Sin token concreto, cierra todas las del usuario.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AccountRecoveryService.VerifyAccountAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Activa la cuenta y devuelve una sesion, para que el usuario entre directo.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AccountRecoveryService.ForgotPasswordAsync(System.String,System.Threading.CancellationToken)">
+             <summary>
+             Inicia la recuperacion de contrasena.
+            
+             <para><b>No revela si el correo existe.</b> El metodo termina en silencio
+             cuando no hay cuenta asociada, y el controlador responde siempre lo
+             mismo. Contestar distinto convertiria este endpoint en un verificador de
+             correos registrados para cualquiera que lo consulte.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AccountRecoveryService.ResetPasswordAsync(System.String,System.String,System.Threading.CancellationToken)">
+             <summary>
+             Cambia la contrasena y cierra todas las sesiones abiertas.
+            
+             <para>Revocar los tokens es parte del caso de uso: si el usuario cambia la
+             contrasena porque sospecha que alguien entro, dejar viva la sesion del
+             intruso vaciaria de sentido la operacion.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Application.AuthTokenService">
+             <summary>
+             Emision y consumo de tokens opacos: refresco, verificacion y recuperacion.
+            
+             <para>Tres decisiones de seguridad que conviene no perder de vista:</para>
+             <list type="number">
+               <item><b>Se guarda el resumen SHA-256, nunca el token.</b> Una copia de la
+               base de datos no permite suplantar a nadie.</item>
+               <item><b>El valor se genera con <see cref="T:System.Security.Cryptography.RandomNumberGenerator"/></b>, no
+               con <c>Random</c> ni con un GUID: 32 bytes de entropia criptografica.</item>
+               <item><b>Los tokens de un solo uso se marcan como usados.</b> Un enlace de
+               recuperacion reenviado o archivado deja de servir tras el primer uso.</item>
+             </list>
+             </summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Iam.Application.AuthTokenService.ResetTtl">
+            <summary>Ventana de validez del enlace de recuperacion de contrasena.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Iam.Application.AuthTokenService.VerificationTtl">
+            <summary>Ventana de validez del codigo de verificacion de cuenta.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AuthTokenService.IssueRefreshTokenAsync(System.Guid,System.Threading.CancellationToken)">
+             <summary>
+             Emite un token de refresco y devuelve su valor en claro.
+            
+             <para>Es la unica vez que ese valor existe fuera del navegador del
+             usuario: en base de datos solo queda el resumen.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AuthTokenService.ConsumeRefreshTokenAsync(System.String,System.Threading.CancellationToken)">
+             <summary>
+             Valida un token de refresco y lo rota.
+            
+             <para>La rotacion es deliberada: el token usado se revoca y se entrega uno
+             nuevo. Si alguien robara uno y lo usara, el legitimo dejaria de funcionar
+             y el robo se haria visible.</para>
+             </summary>
+             <returns>el identificador del usuario dueno del token</returns>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AuthTokenService.RevokeAsync(System.Nullable{System.Guid},System.String,System.Threading.CancellationToken)">
+            <summary>Revoca un token concreto; si no se indica, cierra todas las sesiones.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AuthTokenService.ConsumeSingleUseAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Valida y marca como usado un token de un solo uso.</summary>
+            <returns>el identificador del usuario dueno del token</returns>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Application.AuthTokenService.RandomToken">
+            <summary>32 bytes de entropia en base64 apta para URL.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Model.EmailAddress">
+             <summary>
+             Correo electronico validado.
+            
+             <para>Envolverlo en un tipo propio impide que una cadena cualquiera llegue
+             donde se espera un correo, y centraliza la validacion en un solo sitio.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Model.RoleName">
+             <summary>
+             Rol de la persona en la plataforma.
+             </summary>
+             <remarks>
+             <para>Es distinto del papel que tiene dentro de una organizacion, que vive
+             en el modulo de organizaciones y decide que locales puede ver. Aqui solo se
+             distingue a quien usa el producto de quien lo administra.</para>
+            
+             <para>Antes el rol por defecto se llamaba RESIDENT, del segmento
+             residencial. Ya no describe a nadie: quien entra ahora es el personal de un
+             establecimiento.</para>
+             </remarks>
+        </member>
+        <member name="F:Sems.Api.Modules.Iam.Domain.Model.RoleName.STAFF">
+            <summary>Personal de un establecimiento. Es el rol por defecto.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Iam.Domain.Model.RoleName.ADMIN">
+            <summary>Administrador de la plataforma.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Model.User">
+             <summary>
+             Usuario del sistema.
+            
+             <para>La contrasena solo existe aqui como resumen: el valor en claro nunca se
+             almacena ni se puede recuperar.</para>
+             </summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Iam.Domain.Model.User.Status">
+            <summary>
+            PENDING mientras no se verifica el correo, ACTIVE despues. Es anulable
+            para no romper las filas anteriores a la verificacion; un valor ausente
+            se trata como ACTIVE.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Model.RefreshToken">
+             <summary>
+             Token de refresco emitido a un usuario.
+            
+             <para><b>Se guarda el resumen SHA-256, nunca el token en claro.</b> Si alguien
+             obtuviera una copia de esta tabla no podria suplantar a nadie: el valor
+             almacenado no sirve para autenticarse.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Model.UserAuthToken">
+             <summary>
+             Token de un solo uso: verificacion de cuenta o recuperacion de contrasena.
+            
+             <para>Como los de refresco, se guarda el resumen y no el valor en claro. La
+             marca de uso garantiza que un enlace no pueda reutilizarse aunque el correo
+             quede archivado o se reenvie.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Repositories.IUserRepository">
+            <summary>Puertos de salida del modulo de identidad.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Domain.Repositories.IRefreshTokenRepository.RevokeAllForUserAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Cierra la sesion en todos los dispositivos del usuario.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Services.IPasswordHashingService">
+            <summary>Hash de contrasenas. El dominio no sabe si detras hay BCrypt u otro.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Services.ITokenService">
+            <summary>Emision del token de acceso.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Domain.Services.IIamEventPublisher">
+             <summary>
+             Puerto de salida de eventos del bounded context IAM.
+            
+             <para>La capa de aplicacion no sabe como se entregan: eso permitio cambiar de
+             Kafka a entrega en proceso sin tocar los casos de uso.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Domain.Services.IIamEventPublisher.PublishVerificationRequested(System.Guid,System.String,System.String)">
+            <summary>
+            Pide el envio del codigo de verificacion. El token viaja en el evento
+            porque es la unica vez que existe en claro: en base de datos solo queda
+            su resumen.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Infrastructure.IamAcl">
+            <summary>Implementacion de la capa anticorrupcion de IAM.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Infrastructure.BCryptPasswordHashingService">
+            <summary>Hash de contrasenas con BCrypt.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Infrastructure.JwtTokenService">
+            <summary>Emision del token de acceso JWT.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Infrastructure.InProcessIamEventPublisher">
+             <summary>
+             Adaptador de salida del bounded context IAM.
+            
+             <para>Sustituye al productor de Kafka. El puerto no cambia: la capa de
+             aplicacion sigue sin saber como se entregan los eventos.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Interfaces.Acl.IIamAcl">
+             <summary>
+             Capa anticorrupcion del bounded context IAM.
+            
+             <para>Es la unica puerta por la que otros modulos preguntan por un usuario.
+             No expone el agregado ni las entidades de IAM: devuelve solo el dato concreto
+             que el otro contexto necesita, de modo que un cambio interno en IAM no se
+             propaga.</para>
+            
+             <para>Esto reemplaza a la tabla <c>user_contacts</c> del disenio de
+             microservicios, que existia unicamente porque el servicio de alertas no podia
+             consultar a IAM y tenia que replicar los correos escuchando eventos. Al vivir
+             ambos en el mismo proceso, esa duplicacion de estado desaparece.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.Acl.IIamAcl.EmailOfAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Correo del usuario, o null si no existe.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Interfaces.AuthenticationController">
+             <summary>
+             API REST de autenticacion.
+            
+             <para>En la capa de interfaces el controlador solo maneja HTTP: lee la
+             peticion, delega en el servicio de aplicacion y devuelve la respuesta. No
+             contiene logica de negocio.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.AuthenticationController.Register(Sems.Api.Modules.Iam.Interfaces.AuthResources.RegisterRequest)">
+            <summary>Creates a new account.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.AuthenticationController.Login(Sems.Api.Modules.Iam.Interfaces.AuthResources.LoginRequest)">
+            <summary>Signs in with email and password.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.AuthenticationController.Refresh(Sems.Api.Modules.Iam.Interfaces.AuthResources.RefreshRequest)">
+            <summary>Issues a new token pair and rotates the refresh token provided.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.AuthenticationController.Logout(Sems.Api.Modules.Iam.Interfaces.AuthResources.LogoutRequest)">
+             <summary>
+             Signs out by revoking the refresh token.
+            
+             <para>Always answers 204: asking to close a session that no longer exists
+             is not an error from the client's point of view.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.AuthenticationController.Verify(Sems.Api.Modules.Iam.Interfaces.AuthResources.VerifyRequest)">
+            <summary>Activates the account with the code received by email.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.AuthenticationController.ForgotPassword(Sems.Api.Modules.Iam.Interfaces.AuthResources.ForgotPasswordRequest)">
+             <summary>
+             Starts the password recovery flow.
+            
+             <para>Answers the same whether or not the account exists. Answering
+             differently would turn this endpoint into a checker of registered
+             emails.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.AuthenticationController.ResetPassword(Sems.Api.Modules.Iam.Interfaces.AuthResources.ResetPasswordRequest)">
+            <summary>Changes the password and closes every open session.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Interfaces.AuthResources">
+            <summary>
+            JSON contract of the identity module, in camelCase as in the original
+            Spring service.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Interfaces.AuthResources.LoginResponse">
+             <summary>
+             Respuesta de autenticacion.
+            
+             <para>Lleva dos tokens: el de acceso, de vida corta, que viaja en cada
+             peticion, y el de refresco, de vida larga, que solo se usa para pedir uno
+             nuevo. Separar ambos limita el danio si el de acceso se filtra.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.AuthResources.LoginResponse.#ctor(System.String,System.String,System.Guid,System.String,System.Collections.Generic.List{System.String})">
+             <summary>
+             Respuesta de autenticacion.
+            
+             <para>Lleva dos tokens: el de acceso, de vida corta, que viaja en cada
+             peticion, y el de refresco, de vida larga, que solo se usa para pedir uno
+             nuevo. Separar ambos limita el danio si el de acceso se filtra.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Interfaces.UserResource">
+            <summary>Details of the user the request token belongs to.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.UserResource.#ctor(System.Guid,System.String,System.Collections.Generic.List{System.String})">
+            <summary>Details of the user the request token belongs to.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Iam.Interfaces.UserController">
+             <summary>
+             Consulta del usuario autenticado.
+            
+             <para>El cliente conoce su identificador porque se lo devolvio el inicio de
+             sesion, pero ese dato caduca con el token y no sirve para saber si el papel
+             del usuario cambio despues. Este recurso resuelve la identidad desde el
+             token en cada peticion, que es la unica fuente en la que el cliente no
+             puede influir.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.UserController.Me(System.Threading.CancellationToken)">
+            <summary>Returns the user who owns the token used to call.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Iam.Interfaces.UserController.UsuarioDelToken">
+             <summary>
+             Lee el identificador del usuario desde el token.
+            
+             <para>Se consultan los dos nombres posibles porque JwtBearer traduce
+             <c>sub</c> a <see cref="F:System.Security.Claims.ClaimTypes.NameIdentifier"/> cuando el mapeo de
+             nombres esta activo, y lo deja tal cual cuando no lo esta. Mirar solo uno
+             funciona hasta que alguien cambia esa opcion.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Application.OrganizationCommandService">
+            <summary>
+            Casos de uso que modifican organizaciones, locales, zonas y vinculos.
+            </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Application.OrganizationCommandService.RegisterAsync(System.String,System.String,System.String,System.String,System.Guid,System.Threading.CancellationToken)">
+            <summary>
+            Da de alta una organizacion y deja a quien la crea como administrador.
+            </summary>
+            <remarks>
+            Las dos cosas van juntas a proposito. Una organizacion sin ningun
+            administrador no la puede gestionar nadie: no habria quien diera de alta
+            el primer local ni quien invitara al primer supervisor.
+            </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Application.OrganizationCommandService.GrantMembershipAsync(System.Guid,System.Guid,System.String,System.Nullable{System.Guid},System.Threading.CancellationToken)">
+            <summary>Da acceso a una persona, o cambia el que ya tenia.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Application.OrganizationQueryService">
+            <summary>Consultas del modulo de organizaciones.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Application.OrganizationQueryService.ListMineAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Organizaciones a las que pertenece una persona.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.Membership">
+             <summary>
+             Vinculo entre una persona y una organizacion, con su papel y su alcance.
+            
+             <para>Es lo que sustituye al usuario unico del segmento residencial. En una
+             casa, quien entra es el dueno y ve todo. En una cadena, el jefe de tienda de
+             Miraflores no tiene por que ver el consumo de San Isidro, y el operario no
+             tiene por que poder dar de baja un local.</para>
+            
+             <para>El alcance se decide con <see cref="P:Sems.Api.Modules.Organizations.Domain.Model.Membership.SiteId"/>: si es nulo, el vinculo
+             cubre la organizacion entera; si trae un local, solo ese.</para>
+             </summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Membership.SiteId">
+            <summary>Local al que se limita el vinculo. Nulo = toda la organizacion.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Model.Membership.AlcanzaAlLocal(System.Guid)">
+            <summary>Si este vinculo permite ver o tocar el local indicado.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Membership.PuedeModificar">
+            <summary>Si este vinculo permite modificar, no solo consultar.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Membership.PuedeAdministrarLaOrganizacion">
+            <summary>Si este vinculo permite gestionar locales y personas.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.Organization">
+             <summary>
+             Raiz del agregado Organization: la empresa que contrata el servicio.
+            
+             <para>Es el nivel mas alto del segmento: una cadena de supermercados es una
+             organizacion con varios locales. Una tienda independiente tambien es una
+             organizacion, solo que con un local. Modelarlo asi evita tener dos caminos
+             distintos segun el tamano del cliente.</para>
+             </summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Organization.LegalName">
+            <summary>Razon social, la que figura en la factura.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Organization.TradeName">
+            <summary>Nombre comercial, el que ve el publico. Puede no existir.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Organization.TaxId">
+            <summary>RUC. Identifica al contribuyente y no se repite.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Model.Organization.#ctor">
+            <summary>Constructor sin argumentos que exige EF Core al rehidratar.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Model.Organization.Register(System.String,System.String,System.String,Sems.Api.Modules.Organizations.Domain.Model.BusinessType)">
+            <summary>Unica forma correcta de dar de alta una organizacion.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.Site">
+             <summary>
+             Raiz del agregado Site: un local fisico con su propio suministro electrico.
+            
+             <para>Es la unidad que de verdad importa para la energia. Cada local tiene su
+             medidor, su contrato con la distribuidora y su factura, asi que es el nivel
+             al que se predice el gasto y se compara el rendimiento entre locales de la
+             misma cadena.</para>
+            
+             <para>Es agregado aparte de <see cref="T:Sems.Api.Modules.Organizations.Domain.Model.Organization"/> a proposito: una
+             cadena puede tener decenas de locales y cargarlos todos para tocar uno solo
+             seria un desperdicio. Se relacionan por identificador, no por referencia.</para>
+             </summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Site.SiteCode">
+            <summary>Codigo interno del local dentro de la cadena. Unico por organizacion.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Site.FloorAreaM2">
+            <summary>Superficie en metros cuadrados. Permite comparar locales de distinto tamano.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Site.ContractedPowerKw">
+            <summary>
+            Potencia contratada en kW.
+            </summary>
+            <remarks>
+            Es el limite pactado con la distribuidora. Superarlo no corta la luz: se
+            factura como exceso, y ese recargo es una de las fugas de dinero mas
+            habituales en un local, porque no aparece en el consumo de energia sino
+            en un cargo aparte que casi nadie mira.
+            </remarks>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Site.ExcludesSundaysFromPeak">
+            <summary>
+            Si este suministro tiene concedida la exclusion de domingos y feriados del
+            horario de punta.
+            </summary>
+            <remarks>
+            El pliego fija la hora punta de 18:00 a 23:00 <b>todos los dias</b>, y permite
+            excluir domingos y feriados solo <i>a solicitud del cliente</i>. No es el caso
+            general, asi que por defecto es falso: darlo por concedido subestimaria la
+            factura de todos los locales que no lo pidieron.
+            </remarks>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Model.Site.#ctor">
+            <summary>Constructor sin argumentos que exige EF Core al rehidratar.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Model.Site.ExcesoDePotencia(System.Decimal)">
+            <summary>
+            Cuanto se pasa de la potencia contratada una demanda dada, en kW.
+            Cero si no la supera.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.Zone">
+             <summary>
+             Zona dentro de un local: sala de ventas, camaras, almacen, cocina, oficinas.
+            
+             <para>Es una entidad del agregado <see cref="T:Sems.Api.Modules.Organizations.Domain.Model.Site"/>, no una raiz: una zona
+             no existe fuera de su local y siempre se llega a ella a traves de el.</para>
+             </summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Organizations.Domain.Model.Zone.OperatesOffHours">
+            <summary>
+            Si la zona funciona fuera del horario de atencion.
+            </summary>
+            <remarks>
+            Lo usa el modulo de alertas: consumo de madrugada en una camara
+            frigorifica es lo esperado, y en la sala de ventas es una luz o un equipo
+            que alguien se dejo encendido. Sin este dato, la misma regla genera
+            avisos falsos en una zona y se calla en la otra.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.BusinessType">
+            <summary>Tipo de negocio del establecimiento.</summary>
+            <remarks>
+            No es decorativo: el perfil de consumo cambia radicalmente entre uno y otro.
+            Un supermercado gasta la mayor parte en refrigeracion, que funciona las 24
+            horas; un restaurante concentra el gasto en cocina y en las horas de
+            servicio. La analitica compara cada local contra otros de su mismo tipo.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.ZoneType">
+            <summary>Zona dentro de un local.</summary>
+            <remarks>
+            Sustituye a la "habitacion" del segmento residencial. La diferencia no es
+            solo de nombre: una camara frigorifica no se apaga de noche y una sala de
+            ventas si, asi que una misma alerta de "consumo fuera de horario" es normal
+            en una y sospechosa en la otra.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.TariffCategory">
+             <summary>
+             Categoria tarifaria del suministro, segun el pliego de OSINERGMIN.
+             </summary>
+             <remarks>
+             <para>Aqui esta la diferencia economica de fondo con el segmento
+             residencial. Una vivienda en BT5B paga un precio unico por kWh. Un
+             establecimiento en BT3, BT4, MT2 o MT3 paga tres cosas distintas: la energia
+             consumida en hora punta, la consumida fuera de punta, y un cargo por
+             potencia sobre la demanda maxima registrada en el mes.</para>
+            
+             <para>Ese cargo por potencia es lo que sorprende a un local: un pico de
+             quince minutos al arrancar los compresores encarece la factura del mes
+             entero, aunque la energia total no haya subido. Sin modelarlo, la prediccion
+             de factura se queda corta y las recomendaciones de ahorro apuntan al sitio
+             equivocado.</para>
+             </remarks>
+        </member>
+        <member name="F:Sems.Api.Modules.Organizations.Domain.Model.TariffCategory.BT5B">
+            <summary>Baja tension sin cargo por potencia. Solo para locales muy pequenos.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.OrgStatus">
+            <summary>Estado de una organizacion, local o zona.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.MembershipRole">
+            <summary>Papel de una persona dentro de una organizacion.</summary>
+            <remarks>
+            Un establecimiento no lo lleva una sola persona, a diferencia de una casa.
+            El alcance de cada papel se resuelve en <see cref="T:Sems.Api.Modules.Organizations.Domain.Model.Membership"/>: el
+            administrador manda en toda la cadena, el supervisor solo en su local.
+            </remarks>
+        </member>
+        <member name="F:Sems.Api.Modules.Organizations.Domain.Model.MembershipRole.ORG_ADMIN">
+            <summary>Gestiona la organizacion entera: locales, personas y suscripcion.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Organizations.Domain.Model.MembershipRole.SUPERVISOR">
+            <summary>Gestiona el local que tiene asignado.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Organizations.Domain.Model.MembershipRole.OPERATOR">
+            <summary>Solo consulta.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Model.OrganizationEnums.Parse``1(System.String,System.String)">
+            <summary>
+            Convierte texto no confiable en un valor del enum, o falla con un error
+            que nombra el campo. Se hace en un solo sitio para que todos los enums
+            del modulo rechacen la entrada invalida de la misma forma.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Model.TariffCategoryExtensions">
+            <summary>
+            Si la categoria tarifaria cobra por potencia contratada ademas de por
+            energia.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Domain.Repositories.IOrganizationRepository">
+            <summary>Puertos de salida del modulo de organizaciones.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Repositories.ISiteRepository.FindByOrganizationIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Locales vigentes de la organizacion. Los archivados no salen.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Repositories.IZoneRepository.FindBySiteIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Zonas vigentes del local. Las archivadas no salen.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Domain.Repositories.IMembershipRepository.FindByUserIdAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Vinculos vigentes de una persona. Puede pertenecer a varias organizaciones.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Infrastructure.OrganizationConfig">
+            <summary>
+            Mapeo a tablas del modulo de organizaciones. Prefijo <c>og_</c>.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Interfaces.OrganizationController">
+            <summary>REST API for organizations and sites.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.OrganizationController.Create(Sems.Api.Modules.Organizations.Interfaces.OrganizationResources.CreateOrganizationRequest)">
+            <summary>Registers an organization and makes its creator the administrator.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.OrganizationController.Mine(System.String)">
+            <summary>Organizations a person belongs to, with their role.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.OrganizationController.CreateSite(System.String,Sems.Api.Modules.Organizations.Interfaces.OrganizationResources.CreateSiteRequest)">
+            <summary>Registers a site in the organization.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.OrganizationController.ListSites(System.String)">
+            <summary>Active sites of the organization.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.OrganizationController.ListMembers(System.String)">
+            <summary>People with access to the organization.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.OrganizationController.GrantMembership(System.String,Sems.Api.Modules.Organizations.Interfaces.OrganizationResources.GrantMembershipRequest)">
+            <summary>Grants access to a person, or changes their existing access.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.OrganizationController.ParseId(System.String,System.String)">
+            <summary>
+            Converts the identifier from the route or the body into a Guid.
+            </summary>
+            <remarks>
+            Sin esto, un identificador mal formado provoca una excepcion de formato
+            que sale como 500, cuando en realidad la peticion viene mal: es un 400.
+            </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Interfaces.SiteController">
+            <summary>REST API for sites and their zones.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.SiteController.ListZones(System.String)">
+            <summary>Active zones of the site.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Interfaces.OrganizationResources">
+             <summary>
+             JSON contract of the organizations module, in snake_case.
+             </summary>
+             <remarks>
+             Se elige snake_case por ser el que usan la mayoria de modulos (energia,
+             analitica, alertas y pagos). Modulo nuevo, criterio unico: aqui no hay
+             historia previa que respetar.
+            
+             Ojo con los atributos de validacion: en un record van como
+             <c>[Required]</c>, sin el prefijo <c>property:</c>. Con el prefijo ASP.NET
+             los ignora en silencio y el endpoint acepta cuerpos incompletos.
+             </remarks>
+        </member>
+        <member name="T:Sems.Api.Modules.Organizations.Interfaces.OrganizationResources.MyOrganizationResource">
+            <summary>Organization together with the role the caller holds in it.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Organizations.Interfaces.OrganizationResources.MyOrganizationResource.#ctor(Sems.Api.Modules.Organizations.Interfaces.OrganizationResources.OrganizationResource,System.String,System.String)">
+            <summary>Organization together with the role the caller holds in it.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Application.PaymentResult">
+            <summary>Resultado de procesar un cobro: el pago y, si prospero, su comprobante.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.PaymentResult.#ctor(Sems.Api.Modules.Payments.Domain.Model.Payment,Sems.Api.Modules.Payments.Domain.Model.Invoice)">
+            <summary>Resultado de procesar un cobro: el pago y, si prospero, su comprobante.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Application.PaymentCommandService">
+            <summary>Casos de uso de cobro.</summary>
+        </member>
+        <member name="F:Sems.Api.Modules.Payments.Application.PaymentCommandService.MethodCheckout">
+            <summary>Marca del metodo cuando el cobro viene de una sesion de Stripe Checkout.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.PaymentCommandService.ProcessAsync(System.Nullable{System.Guid},System.Guid,System.Guid,System.Double,System.String,System.String,System.Threading.CancellationToken)">
+             <summary>
+             Cobra con una tarjeta ya guardada.
+            
+             <para>El pago se guarda antes de llamar a Stripe: si la llamada externa
+             falla o el proceso muere a mitad, queda constancia del intento en lugar
+             de un cobro fantasma sin registro.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.PaymentCommandService.CreateCheckoutSessionAsync(System.Guid,System.Nullable{System.Guid},System.String,System.Double,System.String,System.String,System.String,System.Threading.CancellationToken)">
+             <summary>
+             Crea una sesion de Stripe Checkout.
+            
+             <para>El usuario paga en la pagina de Stripe y vuelve a la aplicacion. El
+             registro del cobro no se crea aqui: se crea cuando llega el webhook
+             <c>checkout.session.completed</c>, que es el unico aviso fiable de que el
+             dinero se movio.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.PaymentCommandService.RecordCheckoutPaymentAsync(System.Guid,System.Nullable{System.Guid},System.Double,System.String,System.String,System.Threading.CancellationToken)">
+             <summary>
+             Registra el cobro que confirma una sesion de Checkout.
+            
+             <para>Es idempotente a proposito: Stripe reintenta los webhooks, y sin
+             esta comprobacion un mismo pago se registraria varias veces.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.PaymentCommandService.PublishProcessed(Sems.Api.Modules.Payments.Domain.Model.Payment)">
+             <summary>
+             Publica el cobro completado.
+            
+             <para>Lo escucha el modulo de notificaciones para enviar el comprobante
+             por correo. Antes viajaba por el topic <c>payments.events</c>.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Application.PaymentMethodCommandService">
+            <summary>Alta y gestion de medios de pago del usuario.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.PaymentMethodCommandService.RegisterAsync(System.Guid,System.String,System.String,System.Boolean,System.Threading.CancellationToken)">
+             <summary>
+             Guarda una tarjeta.
+            
+             <para>Los datos visibles se leen de Stripe, no del cliente: asi la marca y
+             los ultimos digitos que mostramos son los reales y no lo que alguien
+             decida enviar en el cuerpo de la peticion.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.PaymentMethodCommandService.ClearCurrentDefaultAsync(System.Guid,System.Threading.CancellationToken)">
+            <summary>Solo puede haber un medio de pago predeterminado por usuario.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Application.PaymentQueryService">
+            <summary>Consultas del modulo de pagos.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Application.WebhookCommandService">
+             <summary>
+             Procesa los avisos que envia Stripe.
+            
+             <para>El webhook es la unica fuente fiable sobre si el dinero se movio: la
+             respuesta inmediata al usuario puede perderse si cierra el navegador, pero
+             Stripe reintenta el aviso hasta que respondemos 200.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.WebhookCommandService.HandleStripeAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <returns>true si el evento se proceso, false si era un reenvio ya conocido</returns>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.WebhookCommandService.HandleCheckoutCompletedAsync(Sems.Api.Modules.Payments.Domain.Services.ProviderWebhookEvent,System.Threading.CancellationToken)">
+            <summary>El usuario completo el pago en la pagina alojada por Stripe.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Application.WebhookCommandService.HandlePaymentIntentAsync(Sems.Api.Modules.Payments.Domain.Services.ProviderWebhookEvent,System.Threading.CancellationToken)">
+            <summary>Cambio de estado de un cobro iniciado desde la aplicacion.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Model.Payment">
+            <summary>Cobro asociado a una suscripcion.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Domain.Model.Payment.Create(System.Nullable{System.Guid},System.Guid,System.Nullable{System.Guid},System.Double,System.String,System.String)">
+            <summary>El importe pasa por <see cref="T:Sems.Api.Modules.Payments.Domain.Model.Money"/>, que garantiza que sea positivo.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Model.PaymentMethodEntity">
+             <summary>
+             Medio de pago guardado del usuario.
+            
+             <para>Solo se almacenan los datos que Stripe devuelve para mostrar la
+             tarjeta: marca, ultimos cuatro digitos y vencimiento. <b>El numero completo y
+             el CVV nunca tocan esta base de datos.</b></para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Model.Invoice">
+            <summary>Comprobante emitido cuando un cobro se completa.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Domain.Model.Invoice.IssueFor(System.Guid,System.Double,System.String)">
+            <summary>
+            El numero de comprobante se compone de la fecha y el primer bloque del
+            identificador, igual que en el servicio original: <c>INV-20260905-A1B2C3D4</c>.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Model.PaymentWebhookEvent">
+             <summary>
+             Evento recibido del proveedor de pagos.
+            
+             <para>Se guarda el cuerpo original para auditoria y, sobre todo, para
+             detectar reenvios: Stripe reintenta los webhooks, asi que sin este registro
+             un mismo cobro podria contabilizarse dos veces.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Model.Money">
+             <summary>
+             Importe con su moneda.
+            
+             <para>Mantenerlos juntos evita el error clasico de pasear un numero suelto
+             sin saber si son soles, dolares o euros. La moneda se normaliza a minusculas
+             porque es lo que espera Stripe.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Domain.Model.Money.ToMinorUnits">
+            <summary>Stripe cobra en la unidad minima: centimos, no soles.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Model.PaymentStatus">
+             <summary>
+             Ciclo de vida de un pago.
+            
+             <para>El camino normal es pending, processing, processed. Fallido y cancelado
+             son estados finales. Se serializan en minusculas, igual que en el servicio en
+             Go.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Repositories.IPaymentRepository">
+            <summary>Puertos de salida del modulo de pagos.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Domain.Repositories.IWebhookEventRepository.FindByProviderEventIdAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Sirve para descartar reenvios del mismo evento.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Services.IPaymentProvider">
+             <summary>
+             Puerto hacia el procesador de pagos.
+            
+             <para>La capa de aplicacion depende solo de esta interfaz, nunca del SDK de
+             Stripe. Eso permite sustituir el proveedor o usar un doble en pruebas sin
+             tocar la logica de negocio.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Domain.Services.IPaymentProvider.ParseWebhookEvent(System.String,System.String)">
+            <summary>Verifica la firma y traduce el evento. Lanza si la firma no cuadra.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Services.PaymentMethodDetails">
+            <summary>Datos visibles de una tarjeta guardada.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Domain.Services.PaymentMethodDetails.#ctor(System.String,System.String,System.String,System.Int32,System.Int32)">
+            <summary>Datos visibles de una tarjeta guardada.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Services.CreateCheckoutSessionRequest">
+            <summary>Solicitud de sesion de pago alojada por Stripe (Stripe Checkout).</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Domain.Services.CreateCheckoutSessionRequest.#ctor(System.String,System.String,System.String,System.Double,System.String,System.String,System.String)">
+            <summary>Solicitud de sesion de pago alojada por Stripe (Stripe Checkout).</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Services.ProviderWebhookEvent">
+            <summary>Evento de webhook ya verificado y normalizado por el adaptador.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Domain.Services.ProviderWebhookEvent.#ctor(System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.String,System.Nullable{System.Double},System.String)">
+            <summary>Evento de webhook ya verificado y normalizado por el adaptador.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Domain.Services.PaymentStatusMapper">
+             <summary>
+             Traduce el vocabulario de estados de Stripe al del dominio.
+            
+             <para>Aisla al dominio del proveedor: si manana cambian sus nombres de
+             estado, solo cambia esta clase.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Infrastructure.WebhookEventConfig">
+             <summary>
+             Evento de webhook.
+            
+             <para>El identificador del proveedor es unico: es lo que impide procesar dos
+             veces el mismo cobro cuando Stripe reintenta la entrega.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Infrastructure.StripePaymentAdapter">
+             <summary>
+             Adaptador de Stripe.
+            
+             <para>Es el unico punto del sistema que conoce el SDK de Stripe. Traduce
+             entre sus tipos y los del puerto <see cref="T:Sems.Api.Modules.Payments.Domain.Services.IPaymentProvider"/>, de modo que
+             ni el dominio ni la capa de aplicacion dependen del proveedor.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Infrastructure.StripePaymentAdapter.CreateCheckoutSessionAsync(Sems.Api.Modules.Payments.Domain.Services.CreateCheckoutSessionRequest,System.Threading.CancellationToken)">
+             <summary>
+             Crea una sesion de Stripe Checkout.
+            
+             <para>El usuario paga en una pagina alojada por Stripe, asi que los datos
+             de la tarjeta nunca pasan por nuestros servidores. Los identificadores
+             viajan como metadatos para poder correlacionar el webhook con nuestro
+             registro.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Interfaces.PaymentController">
+            <summary>Charges and payment sessions.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentController.Process(Sems.Api.Modules.Payments.Interfaces.PaymentResources.ProcessPaymentRequest)">
+            <summary>Charges a saved card.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentController.CreateCheckoutSession(Sems.Api.Modules.Payments.Interfaces.PaymentResources.CreateCheckoutRequest)">
+             <summary>
+             Opens a Stripe Checkout session.
+            
+             <para>Returns the URL the web application must redirect to. Card details
+             are entered on Stripe's page, never in SEMS.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentController.ByUser(System.Guid)">
+            <summary>A user's payments.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentController.BySubscription(System.Guid)">
+            <summary>Payments of a subscription.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentController.ById(System.Guid)">
+            <summary>Gets a payment by its identifier.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Interfaces.PaymentMethodController">
+            <summary>Payment methods saved by the user.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentMethodController.Register(Sems.Api.Modules.Payments.Interfaces.PaymentResources.RegisterPaymentMethodRequest)">
+            <summary>Saves a payment method.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentMethodController.ByUser(System.Guid)">
+            <summary>A user's payment methods.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentMethodController.SetDefault(System.Guid)">
+            <summary>Marks a payment method as the default one.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentMethodController.Delete(System.Guid)">
+            <summary>Deletes a payment method.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Interfaces.InvoiceController">
+            <summary>Invoices issued for each completed charge.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.InvoiceController.ById(System.Guid)">
+            <summary>Gets an invoice by its identifier.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.InvoiceController.ByPayment(System.Guid)">
+            <summary>Invoice associated with a payment.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Interfaces.StripeWebhookController">
+             <summary>
+             Punto de entrada de los avisos de Stripe.
+            
+             <para>El cuerpo se lee como texto crudo a proposito: la verificacion de firma
+             se calcula sobre los bytes exactos que envio Stripe, y cualquier
+             deserializacion intermedia los alteraria y haria fallar la comprobacion.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.StripeWebhookController.HandleStripe">
+            <summary>Receives a Stripe event.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Interfaces.PaymentResources">
+            <summary>JSON contract of the payments module, in snake_case as in the original service.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Payments.Interfaces.PaymentResources.CreateCheckoutRequest">
+            <summary>Body the web application sends to open Stripe Checkout.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Payments.Interfaces.PaymentResources.CreateCheckoutRequest.#ctor(System.String,System.String,System.String,System.Double,System.String,System.String,System.String)">
+            <summary>Body the web application sends to open Stripe Checkout.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Application.SubscriptionService">
+            <summary>Casos de uso del modulo de suscripciones.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Application.SubscriptionService.UpdateStatusFromStripeAsync(System.String,Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionStatus,System.Threading.CancellationToken)">
+            <summary>Usado por el webhook de Stripe para reflejar el estado real del cobro.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Application.SubscriptionService.PublishChangeAsync(Sems.Api.Modules.Subscriptions.Domain.Model.Subscription,System.Threading.CancellationToken)">
+             <summary>
+             Avisa al resto del sistema del cambio de plan.
+            
+             <para>Antes viajaba por el topic <c>subscriptions.events</c>.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionStatus">
+            <summary>Estados posibles de una suscripcion.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionStatusExtensions.IsFinal(Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionStatus)">
+            <summary>Una suscripcion cancelada o vencida ya no admite cambios.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Domain.Model.PlanFeature">
+             <summary>
+             Caracteristica incluida en un plan.
+            
+             <para>El valor es texto libre para poder expresar tanto interruptores
+             (<c>"enabled"</c>) como limites numericos (<c>"3"</c>), que es como el
+             frontend decide cuantos dispositivos permite cada plan.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionPlan">
+            <summary>Plan comercial al que un usuario puede suscribirse.</summary>
+        </member>
+        <member name="P:Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionPlan.PlanFeatures">
+            <summary>Relacion de navegacion: EF Core carga las caracteristicas con el plan.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionPlan.StripePriceId">
+            <summary>Identificador del precio en Stripe, si el plan esta enlazado.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Domain.Model.Subscription">
+             <summary>
+             Suscripcion de un usuario a un plan.
+            
+             <para><c>EndDate</c> y <c>StripeSubscriptionId</c> son opcionales: el primero
+             solo se llena al cancelar o vencer, y el segundo queda nulo cuando la
+             suscripcion no esta enlazada a Stripe.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Domain.Repositories.IPlanRepository">
+            <summary>Puertos de salida del modulo de suscripciones.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Domain.Services.SubscriptionManager">
+             <summary>
+             Servicio de dominio que concentra las reglas de transicion.
+            
+             <para>No pertenecen a una sola entidad, asi que viven aqui en lugar de
+             dispersarse por la capa de aplicacion.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Infrastructure.PlanSeeder">
+             <summary>
+             Carga los tres planes por defecto la primera vez que arranca el sistema.
+            
+             <para>Solo actua si no hay ningun plan, de modo que reiniciar la aplicacion
+             nunca duplica ni sobreescribe lo existente.</para>
+            
+             <para>El limite de dispositivos vive como caracteristica del plan
+             (<c>LINKED_DEVICES_LIMIT</c>) y no en el codigo: asi se puede cambiar sin
+             volver a desplegar.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionController">
+             <summary>
+             API REST del bounded context de suscripciones.
+            
+             <para>Rutas identicas a las del microservicio en Go. Ojo con el orden de los
+             segmentos: <c>/subscriptions/users/{userId}</c> debe declararse antes que
+             <c>/subscriptions/{subscriptionId}</c> para que "users" no se interprete
+             como un identificador. La restriccion <c>:guid</c> lo garantiza ademas por
+             tipo.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionController.Plans">
+            <summary>Lists the available plans.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionController.PlanById(System.Guid)">
+            <summary>Gets a plan by its identifier.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionController.ByUser(System.String)">
+            <summary>A user's subscriptions.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionController.ById(System.Guid)">
+            <summary>Gets a subscription by its identifier.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionController.Create(Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionResources.CreateSubscriptionRequest)">
+            <summary>Creates a subscription.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionController.Cancel(System.Guid)">
+            <summary>Cancels a subscription.</summary>
+        </member>
+        <member name="M:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionController.ChangePlan(System.Guid,Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionResources.ChangePlanRequest)">
+            <summary>Changes the plan of a subscription.</summary>
+        </member>
+        <member name="T:Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionResources">
+             <summary>
+             Contrato JSON del modulo de suscripciones.
+            
+             <para><b>Es un contrato mixto y hay que respetarlo tal cual.</b> El servicio
+             en Go leia los cuerpos con etiquetas snake_case, pero devolvia las entidades
+             directamente, sin etiquetas, de modo que Go serializaba usando el nombre del
+             campo en PascalCase. El frontend esta escrito contra eso y lo documenta en
+             <c>subscriptions.service.ts</c>.</para>
+            
+             <para>Por eso: <b>peticiones en snake_case, respuestas en PascalCase</b>.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Configuration.DotEnv">
+             <summary>
+             Carga un archivo <c>.env</c> a variables de entorno del proceso.
+            
+             <para>ASP.NET Core no lee <c>.env</c> por su cuenta, a diferencia de Spring
+             Boot, que lo importaba con <c>spring.config.import</c>. Sin esto el archivo
+             <c>.env.example</c> no serviria de nada y habria que exportar cada variable a
+             mano antes de arrancar.</para>
+            
+             <para><b>Solo es para desarrollo local.</b> En el hosting las variables se
+             definen en el panel del proveedor y el archivo no existe, por eso su ausencia
+             no es un error.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Shared.Configuration.DotEnv.Load(System.String)">
+            <summary>
+            Lee el archivo indicado si existe. Las variables que ya esten definidas
+            en el entorno <b>no se pisan</b>: lo que configure el hosting siempre
+            gana sobre un archivo que alguien se dejo olvidado en su maquina.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Errors.ErrorCode">
+            <summary>Categorias de error que reconoce la aplicacion.</summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Errors.AppException">
+             <summary>
+             Error de aplicacion comun a todos los modulos.
+            
+             <para>El dominio lanza esta excepcion y la capa HTTP la convierte en el mismo
+             JSON que ya consume el frontend: <c>{"code": "...", "message": "..."}</c>.
+             Mantener el contrato de error identico es lo que permite cambiar la
+             implementacion del backend sin tocar el manejo de errores del cliente.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Errors.ErrorResponse">
+            <summary>Cuerpo de error devuelto por la API.</summary>
+        </member>
+        <member name="M:Sems.Api.Shared.Errors.ErrorResponse.#ctor(System.String,System.String)">
+            <summary>Cuerpo de error devuelto por la API.</summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Events.IDomainEventHandler`1">
+            <summary>Un consumidor de eventos de dominio.</summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Events.IDomainEventBus">
+            <summary>Unico punto de salida de eventos de dominio del monolito.</summary>
+        </member>
+        <member name="M:Sems.Api.Shared.Events.IDomainEventBus.Publish(Sems.Api.Shared.Events.IDomainEvent)">
+            <summary>
+            Encola un evento. <b>No se entrega de inmediato:</b> los consumidores lo
+            reciben cuando la transaccion que lo origino confirma.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Events.DomainEventBus">
+             <summary>
+             Bus de eventos en proceso.
+            
+             <para>Reemplaza al productor de Kafka. Los eventos se acumulan durante la
+             unidad de trabajo y se despachan solo cuando <c>SaveChangesAsync</c>
+             termina bien. Esa demora deliberada da la misma garantia que buscabamos con
+             el broker: <b>nadie reacciona a un cambio que despues se revierte</b>.</para>
+            
+             <para>Es el equivalente de <c>@TransactionalEventListener(AFTER_COMMIT)</c>
+             en Spring. Si el proyecto vuelve a necesitar un broker, este es el unico
+             archivo que cambia.</para>
+             </summary>
+        </member>
+        <member name="M:Sems.Api.Shared.Events.DomainEventBus.DispatchPendingAsync(System.Threading.CancellationToken)">
+            <summary>
+            Entrega los eventos acumulados. Lo invoca el DbContext tras confirmar.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Events.IDomainEvent">
+            <summary>
+            Contrato comun de todo evento de dominio: sabe cuando ocurrio y a que
+            usuario pertenece.
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Events.DomainEvents">
+             <summary>
+             Eventos que cruzan bounded contexts.
+            
+             <para>Sustituyen a los topics de Kafka del disenio anterior. Cada topic paso
+             a ser un tipo de evento; la entrega ocurre dentro del mismo proceso, despues
+             de que la transaccion del emisor confirme.</para>
+            
+             <para>Equivalencia con el disenio de microservicios:</para>
+             <code>
+               iam.events            -> UserRegistered, UserLoggedIn, VerificationRequested, PasswordResetRequested
+               device.events         -> DeviceRegistered, DeviceLinked, DeviceUnlinked, DeviceStatusUpdated
+               energy.events         -> ReadingProcessed
+               alerts.events         -> AlertTriggered
+               payments.events       -> PaymentProcessed
+               subscriptions.events  -> SubscriptionChanged
+             </code>
+            
+             <para>Los consumidores no conocen al emisor: escuchan el tipo. Si en el
+             futuro se vuelve a un broker, basta anadir un adaptador que reenvie estos
+             mismos eventos, sin tocar emisores ni consumidores.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Events.DomainEvents.VerificationRequested">
+            <summary>Pide al modulo de notificaciones el codigo de verificacion.</summary>
+        </member>
+        <member name="M:Sems.Api.Shared.Events.DomainEvents.VerificationRequested.#ctor(System.Guid,System.String,System.String)">
+            <summary>Pide al modulo de notificaciones el codigo de verificacion.</summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Events.DomainEvents.PasswordResetRequested">
+            <summary>Pide el enlace de recuperacion de contrasena.</summary>
+        </member>
+        <member name="M:Sems.Api.Shared.Events.DomainEvents.PasswordResetRequested.#ctor(System.Guid,System.String,System.String)">
+            <summary>Pide el enlace de recuperacion de contrasena.</summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Events.DomainEvents.ReadingProcessed">
+            <summary>
+            Lectura del medidor ya validada y almacenada. La escuchan analytics
+            (rankings y proyecciones) y alerts (evaluacion de umbrales).
+            </summary>
+        </member>
+        <member name="M:Sems.Api.Shared.Events.DomainEvents.ReadingProcessed.#ctor(System.Guid,System.Nullable{System.Guid},System.Nullable{System.Guid},System.Decimal,System.DateTime)">
+            <summary>
+            Lectura del medidor ya validada y almacenada. La escuchan analytics
+            (rankings y proyecciones) y alerts (evaluacion de umbrales).
+            </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Health.DatabaseHealthCheck">
+             <summary>
+             Comprueba que la base de datos responde.
+             </summary>
+             <remarks>
+             Va etiquetada como "ready" y se expone solo en /health/ready, no en /health.
+            
+             La separacion importa: el proveedor de hosting usa /health para decidir si el
+             proceso sigue vivo, y reinicia el contenedor cuando falla. Si ahi se mirara
+             la base de datos, un corte de Supabase provocaria reinicios en cadena que no
+             arreglan nada, porque el problema no esta en este proceso.
+             </remarks>
+        </member>
+        <member name="T:Sems.Api.Shared.Http.ExceptionHandlingMiddleware">
+             <summary>
+             Traduce excepciones a respuestas HTTP con el contrato de error compartido.
+            
+             <para>Cada categoria del dominio tiene un unico codigo de estado, igual que
+             en los servicios originales: validacion 400, no encontrado 404 y regla de
+             negocio rota 409.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Persistence.Migrations.CreacionInicial">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.CreacionInicial.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.CreacionInicial.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.CreacionInicial.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Sems.Api.Shared.Persistence.Migrations.SegmentoEstablecimientos">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.SegmentoEstablecimientos.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.SegmentoEstablecimientos.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.SegmentoEstablecimientos.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Sems.Api.Shared.Persistence.Migrations.DispositivosPorLocalYDemanda">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.DispositivosPorLocalYDemanda.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.DispositivosPorLocalYDemanda.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.DispositivosPorLocalYDemanda.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Sems.Api.Shared.Persistence.Migrations.ExclusionDeDomingosEnHoraPunta">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.ExclusionDeDomingosEnHoraPunta.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.ExclusionDeDomingosEnHoraPunta.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:Sems.Api.Shared.Persistence.Migrations.ExclusionDeDomingosEnHoraPunta.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:Sems.Api.Shared.Persistence.SemsDbContext">
+             <summary>
+             Contexto de datos del monolito.
+            
+             <para>Una sola base de datos, pero cada modulo aisla sus tablas por prefijo
+             de nombre (<c>dm_</c> dispositivos, <c>em_</c> energia, <c>an_</c> analitica,
+             <c>al_</c> alertas, <c>pm_</c> pagos, <c>sb_</c> suscripciones, <c>iam_</c>
+             identidad). Separarlas en esquemas distintos mas adelante no exigiria tocar
+             el codigo de dominio.</para>
+            
+             <para>La sobrecarga de <see cref="M:Sems.Api.Shared.Persistence.SemsDbContext.SaveChangesAsync(System.Threading.CancellationToken)"/> es la pieza clave del
+             disenio de eventos: los que se publicaron durante la operacion se entregan
+             <b>despues</b> de que la escritura confirme. Sin eso, un consumidor podria
+             reaccionar a un cambio que luego se revierte y, por ejemplo, enviar un correo
+             de bienvenida a un usuario que no llego a existir.</para>
+             </summary>
+        </member>
+        <member name="T:Sems.Api.Shared.Persistence.SemsDbContextFactory">
+             <summary>
+             Construye el <see cref="T:Sems.Api.Shared.Persistence.SemsDbContext"/> para las herramientas de linea de
+             comandos (<c>dotnet ef migrations add</c>, <c>dotnet ef database update</c>).
+             </summary>
+             <remarks>
+             Sin esta clase, <c>dotnet ef</c> intenta arrancar la aplicacion entera para
+             encontrar el contexto, y eso obliga a tener configuradas todas las variables
+             de entorno solo para generar una migracion.
+            
+             La cadena que se usa aqui no conecta con nada: al generar el SQL de una
+             migracion, EF Core solo necesita saber que el proveedor es PostgreSQL. Si
+             existe DATABASE_URL se usa esa, para que <c>database update</c> tambien
+             funcione contra la base real.
+             </remarks>
+        </member>
+    </members>
+</doc>
