@@ -43,6 +43,14 @@ public sealed class SiteConfig : IEntityTypeConfiguration<Site>
         // El codigo de local se repite entre cadenas distintas (dos empresas
         // pueden llamar "T-001" a su primera tienda), pero no dentro de la misma.
         builder.HasIndex(s => new { s.OrganizationId, s.SiteCode }).IsUnique();
+
+        // Un local pertenece a una organizacion. Restrict y no Cascade: borrar
+        // una organizacion que todavia tiene locales seria un accidente, no una
+        // intencion.
+        builder.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(s => s.OrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -56,6 +64,13 @@ public sealed class ZoneConfig : IEntityTypeConfiguration<Zone>
         builder.Property(z => z.ZoneType).HasConversion<string>().HasMaxLength(30);
         builder.Property(z => z.Status).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(z => z.SiteId);
+
+        // Una zona pertenece a un local. Restrict por el mismo motivo que arriba:
+        // las zonas llevan el historico de consumo colgado por identificador.
+        builder.HasOne<Site>()
+            .WithMany()
+            .HasForeignKey(z => z.SiteId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -74,6 +89,20 @@ public sealed class MembershipConfig : IEntityTypeConfiguration<Membership>
         // organizacion, no dos vinculos que luego habria que resolver por
         // prioridad.
         builder.HasIndex(m => new { m.OrganizationId, m.UserId }).IsUnique();
+
+        // La membresia no significa nada sin su organizacion, asi que cae con
+        // ella. La referencia al local es opcional (una membresia puede valer
+        // para toda la organizacion), y al borrar el local se queda en nulo en
+        // lugar de arrastrar la membresia entera.
+        builder.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(m => m.OrganizationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<Site>()
+            .WithMany()
+            .HasForeignKey(m => m.SiteId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

@@ -19,6 +19,14 @@ public sealed class PaymentConfig : IEntityTypeConfiguration<Payment>
         b.HasIndex(p => p.UserId);
         b.HasIndex(p => p.SubscriptionId);
         b.HasIndex(p => p.StripePaymentIntentId);
+
+        // El medio de pago es opcional y el usuario puede eliminarlo, pero el
+        // pago tiene que sobrevivir: es un registro contable. SubscriptionId no
+        // lleva clave foranea: Subscriptions es otro bounded context.
+        b.HasOne<PaymentMethodEntity>()
+            .WithMany()
+            .HasForeignKey(p => p.PaymentMethodId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -45,6 +53,12 @@ public sealed class InvoiceConfig : IEntityTypeConfiguration<Invoice>
         b.Property(i => i.InvoiceNumber).HasMaxLength(60);
         b.Property(i => i.PdfUrl).HasMaxLength(500);
         b.HasIndex(i => i.PaymentId);
+
+        // No se borra un pago que ya tiene factura emitida.
+        b.HasOne<Payment>()
+            .WithMany()
+            .HasForeignKey(i => i.PaymentId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
