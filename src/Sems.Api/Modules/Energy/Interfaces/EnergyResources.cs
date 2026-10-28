@@ -24,6 +24,12 @@ public static class EnergyResources
     public sealed record RegisterMeterRequest(
         [property: JsonPropertyName("user_id")]
         [Required(ErrorMessage = "is required")] string UserId,
+        // El local es obligatorio: la tarifa, la potencia contratada y el
+        // recibo son del suministro, no de quien da de alta el aparato.
+        [property: JsonPropertyName("site_id")]
+        [Required(ErrorMessage = "is required")] Guid SiteId,
+        // La zona no: al abrir un local puede que aun no esten definidas.
+        [property: JsonPropertyName("zone_id")] Guid? ZoneId,
         [property: JsonPropertyName("meter_serial")]
         [Required(ErrorMessage = "is required")] string MeterSerial,
         [property: JsonPropertyName("model")] string? Model,
@@ -52,9 +58,14 @@ public static class EnergyResources
 
     // -------------------------------------------------------------- respuestas
 
+    public sealed record ReassignMeterZoneRequest(
+        [property: JsonPropertyName("zone_id")] Guid? ZoneId);
+
     public sealed record MeterResponse(
         [property: JsonPropertyName("id")] string Id,
         [property: JsonPropertyName("user_id")] string UserId,
+        [property: JsonPropertyName("site_id")] string SiteId,
+        [property: JsonPropertyName("zone_id")] string? ZoneId,
         [property: JsonPropertyName("meter_serial")] string MeterSerial,
         [property: JsonPropertyName("model")] string? Model,
         [property: JsonPropertyName("brand")] string? Brand,
@@ -67,7 +78,8 @@ public static class EnergyResources
         [property: JsonPropertyName("updated_at")] DateTime UpdatedAt)
     {
         public static MeterResponse From(EnergyMeter m) => new(
-            m.Id.ToString(), m.UserId, m.MeterSerial, m.Model, m.Brand, m.Location, m.Status,
+            m.Id.ToString(), m.UserId, m.SiteId.ToString(), m.ZoneId?.ToString(), m.MeterSerial,
+            m.Model, m.Brand, m.Location, m.Status,
             m.FirmwareVersion, m.MaxPowerWatts, m.RegisteredAt, m.LastSeenAt, m.UpdatedAt);
     }
 

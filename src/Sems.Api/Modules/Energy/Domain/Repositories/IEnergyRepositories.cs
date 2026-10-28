@@ -9,6 +9,12 @@ public interface IEnergyMeterRepository
     Task<EnergyMeter?> FindByIdAsync(Guid id, CancellationToken ct = default);
     Task<EnergyMeter?> FindBySerialAsync(string meterSerial, CancellationToken ct = default);
     Task<List<EnergyMeter>> FindByUserIdAsync(string userId, CancellationToken ct = default);
+
+    /// <summary>Medidores instalados en un local: su cobertura de medicion.</summary>
+    Task<List<EnergyMeter>> FindBySiteIdAsync(Guid siteId, CancellationToken ct = default);
+
+    /// <summary>Medidores de una zona concreta del local.</summary>
+    Task<List<EnergyMeter>> FindByZoneIdAsync(Guid zoneId, CancellationToken ct = default);
 }
 
 public interface IEnergyReadingRepository
@@ -20,6 +26,18 @@ public interface IEnergyReadingRepository
     Task<List<EnergyReading>> FindByRangeAsync(string userId, DateTime from, DateTime to, CancellationToken ct = default);
     Task<EnergyReading?> FindLatestByMeterAsync(string meterId, CancellationToken ct = default);
     Task<EnergyReading?> FindLatestByDeviceAsync(string deviceId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lecturas de un conjunto de medidores desde una fecha.
+    /// </summary>
+    /// <remarks>
+    /// Va por medidor y no por usuario porque el reparto por zona y la
+    /// comparacion entre locales se hacen sobre la instalacion, no sobre quien
+    /// dio de alta el aparato: en una cadena, los medidores de un local pueden
+    /// haberlos registrado varias personas.
+    /// </remarks>
+    Task<List<EnergyReading>> FindByMetersAsync(IReadOnlyCollection<string> meterIds,
+        DateTime from, CancellationToken ct = default);
 }
 
 public interface IDeviceConsumptionRepository

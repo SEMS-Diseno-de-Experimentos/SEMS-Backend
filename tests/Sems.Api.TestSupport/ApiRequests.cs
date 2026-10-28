@@ -113,6 +113,61 @@ public static class ApiRequests
         await (await client.PostSiteAsync(organizationId, siteCode, contractedPowerKw, tariffCategory))
             .ExpectAsync(HttpStatusCode.Created);
 
+    /// <summary>
+    /// Organizacion y local listos de una sola llamada.
+    /// </summary>
+    /// <remarks>
+    /// Casi ningun test habla de organizaciones, pero desde que el medidor
+    /// pertenece a un local necesita uno para existir. Este atajo evita que esa
+    /// preparacion tape lo que cada test esta comprobando de verdad.
+    /// </remarks>
+    public static async Task<Guid> CreateSiteForAsync(this HttpClient client, Guid ownerUserId,
+        decimal contractedPowerKw = 120m, string tariffCategory = "MT2")
+    {
+        var organizacion = await client.CreateOrganizationAsync(ownerUserId);
+        var local = await client.CreateSiteAsync(
+            Guid.Parse(organizacion.Text("organization_id")),
+            $"S-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
+            contractedPowerKw, tariffCategory);
+        return Guid.Parse(local.Text("site_id"));
+    }
+
+    /// <summary>
+    /// Pasa la cuenta al plan sin tope de locales.
+    /// </summary>
+    /// <remarks>
+    /// Toda cuenta nueva nace en el plan de entrada, que incluye un local. Un
+    /// test que necesite varios tiene que cambiar de plan igual que lo haria el
+    /// cliente: el cupo es comportamiento del producto, no un estorbo de la
+    /// preparacion.
+    /// </remarks>
+    public static async Task UseUnlimitedSitesPlanAsync(this HttpClient client, Guid userId)
+    {
+        var planes = await (await client.GetAsync("/api/v1/subscription-plans"))
+            .ExpectAsync(HttpStatusCode.OK);
+        var sinTope = planes.EnumerateArray().First(p => p.GetProperty("PlanFeatures")
+            .EnumerateArray()
+            .Any(f => f.Text("FeatureCode") == "SITES_LIMIT"
+                      && !int.TryParse(f.Text("FeatureValue"), out _)));
+
+        var suscripciones = await (await client.GetAsync($"/api/v1/subscriptions/users/{userId}"))
+            .ExpectAsync(HttpStatusCode.OK);
+        var vigente = suscripciones.EnumerateArray()
+            .First(s => s.Text("Status") == "ACTIVE");
+
+        // Idempotente: hay escenarios que preparan varios locales y cada
+        // preparacion no tiene por que saber si otra ya cambio el plan.
+        if (vigente.Text("PlanID") == sinTope.Text("PlanID"))
+        {
+            return;
+        }
+
+        await (await client.PatchJsonAsync(
+                $"/api/v1/subscriptions/{vigente.Text("SubscriptionID")}/change-plan",
+                new { new_plan_id = sinTope.Text("PlanID") }))
+            .ExpectAsync(HttpStatusCode.OK);
+    }
+
     public static Task<HttpResponseMessage> PostZoneAsync(this HttpClient client, Guid siteId,
         string name, string zoneType) =>
         client.PostJsonAsync($"/api/v1/sites/{siteId}/zones", new
@@ -150,10 +205,12 @@ public static class ApiRequests
     // ------------------------------------------------------------------ energia
 
     public static Task<HttpResponseMessage> PostMeterAsync(this HttpClient client, Guid userId,
-        string meterSerial) =>
+        string meterSerial, Guid siteId, Guid? zoneId = null) =>
         client.PostJsonAsync("/api/v1/energy-meters", new
         {
             user_id = userId.ToString(),
+            site_id = siteId,
+            zone_id = zoneId,
             meter_serial = meterSerial,
             model = "EOS-3F",
             brand = "EOS",

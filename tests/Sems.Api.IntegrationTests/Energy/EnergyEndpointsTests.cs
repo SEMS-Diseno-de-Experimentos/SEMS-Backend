@@ -126,10 +126,12 @@ public class EnergyEndpointsTests : IClassFixture<SemsApiFactory>
     public async Task RegisterMeter_RepeatedSerialNumber_Returns409()
     {
         var user = await _factory.CreateUserAsync();
+        var site = await user.Client.CreateSiteForAsync(user.UserId);
         var serial = $"EOS-{Guid.NewGuid():N}";
-        await (await user.Client.PostMeterAsync(user.UserId, serial)).ExpectAsync(HttpStatusCode.Created);
+        await (await user.Client.PostMeterAsync(user.UserId, serial, site))
+            .ExpectAsync(HttpStatusCode.Created);
 
-        var response = await user.Client.PostMeterAsync(user.UserId, serial);
+        var response = await user.Client.PostMeterAsync(user.UserId, serial, site);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -138,8 +140,9 @@ public class EnergyEndpointsTests : IClassFixture<SemsApiFactory>
     public async Task RecordReading_ValidReading_Returns201()
     {
         var user = await _factory.CreateUserAsync();
-        var meter = await (await user.Client.PostMeterAsync(user.UserId, $"EOS-{Guid.NewGuid():N}"))
-            .ExpectAsync(HttpStatusCode.Created);
+        var site = await user.Client.CreateSiteForAsync(user.UserId);
+        var meter = await (await user.Client.PostMeterAsync(user.UserId, $"EOS-{Guid.NewGuid():N}",
+            site)).ExpectAsync(HttpStatusCode.Created);
 
         var response = await user.Client.PostReadingAsync(user.UserId, meter.Text("id"), null,
             powerWatts: 95_000, frequency: 60);
