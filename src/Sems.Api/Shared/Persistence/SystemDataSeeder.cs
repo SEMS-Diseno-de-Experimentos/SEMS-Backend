@@ -23,14 +23,20 @@ public class SystemDataSeeder
     /// Si se cargan datos de demostracion al registrar una cuenta.
     /// </summary>
     /// <remarks>
-    /// Activado salvo que <c>Seeding:DemoData</c> (o <c>SEED_DEMO_DATA</c>) valga
-    /// <c>false</c>. Las pruebas lo apagan: la siembra corre en segundo plano y
-    /// competiria por la base con la propia prueba.
+    /// <para>Apagado salvo que <c>Seeding:DemoData</c> (o <c>SEED_DEMO_DATA</c>)
+    /// valga <c>true</c>. Antes venia encendido, y eso hacia dos danos a toda
+    /// cuenta real: la primera pantalla mostraba una organizacion "Mi Hogar /
+    /// Empresa" con nueve aparatos inventados y consumos aleatorios, y ese local
+    /// ficticio agotaba el unico que incluye el plan de entrada, de modo que el
+    /// cliente no podia dar de alta el suyo sin cambiar de plan.</para>
+    ///
+    /// <para>Sigue disponible para las demostraciones: basta
+    /// <c>SEED_DEMO_DATA=true</c> en el entorno donde se vaya a ensenar.</para>
     /// </remarks>
     public static bool DemoDataEnabled(IConfiguration configuration) =>
-        !string.Equals(configuration["Seeding:DemoData"]
-                       ?? Environment.GetEnvironmentVariable("SEED_DEMO_DATA"),
-            "false", StringComparison.OrdinalIgnoreCase);
+        string.Equals(configuration["Seeding:DemoData"]
+                      ?? Environment.GetEnvironmentVariable("SEED_DEMO_DATA"),
+            "true", StringComparison.OrdinalIgnoreCase);
 
     public async Task SeedAsync()
     {

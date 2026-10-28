@@ -82,3 +82,19 @@ Feature: Organization, site and zone registration
       | name        | type         | off_hours |
       | Cold rooms  | COLD_STORAGE | yes       |
       | Sales floor | SALES_FLOOR  | no        |
+
+  @US42
+  Scenario: The entry plan's site limit stops the second site
+    Given the administrator has registered an organization
+    When the administrator registers the site "T-001" with 120 kW contracted under the tariff "MT2"
+    Then the site is registered in the organization
+    When the administrator registers the site "T-002" with 90 kW contracted under the tariff "BT3"
+    Then the request is rejected as a conflict
+    And the rejection message is "the Básico plan includes 1 site(s); change the plan to register another one"
+
+  @US42
+  Scenario: Changing the plan lifts the site limit
+    Given the administrator has registered an organization
+    And the organization has the site "T-001"
+    When the administrator registers the site "T-002" with 90 kW contracted under the tariff "BT3"
+    Then the site is registered in the organization

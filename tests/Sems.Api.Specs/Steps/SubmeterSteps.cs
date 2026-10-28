@@ -24,6 +24,9 @@ public sealed class SubmeterSteps
 
     private async Task AddSiteWithZoneAsync(string siteCode, string zoneName)
     {
+        // Igual que en los escenarios de locales: el cupo del plan se comprueba
+        // donde toca y no estorba a las precondiciones.
+        await Supervisor.Client.UseUnlimitedSitesPlanAsync(Supervisor.UserId);
         var site = await Supervisor.Client.CreateSiteAsync(_world.OrganizationId!.Value, siteCode);
         var zone = await Supervisor.Client.CreateZoneAsync(site.Id("site_id"), zoneName,
             ZoneTypeOf(zoneName));

@@ -21,6 +21,8 @@ public class DeviceEndpointsTests : IClassFixture<SemsApiFactory>
     private async Task<Layout> LayoutAsync()
     {
         var user = await _factory.CreateUserAsync();
+        // La maqueta necesita dos locales y el plan de entrada incluye uno.
+        await user.Client.UseUnlimitedSitesPlanAsync(user.UserId);
         var organization = await user.Client.CreateOrganizationAsync(user.UserId);
         var organizationId = organization.Id("organization_id");
         var site = await user.Client.CreateSiteAsync(organizationId, "T-001");
