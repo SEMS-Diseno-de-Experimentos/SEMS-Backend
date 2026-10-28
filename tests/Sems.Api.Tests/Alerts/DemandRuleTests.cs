@@ -109,4 +109,87 @@ public class DemandRuleTests
         Assert.Equal(DemandLevel.OK, regla.Evaluar(500d));
         Assert.False(regla.Active);
     }
+
+    // ------------------------------------------------- silencio entre avisos
+    //
+    // La evaluacion ahora la dispara cada lectura. Un medidor que reporta cada
+    // minuto evaluaria la regla sesenta veces por hora, y sin freno el cliente
+    // recibiria sesenta alertas mientras el local trabaja al 90 % de lo
+    // contratado. El freno vive en la regla y no en quien la llama, para que
+    // valga igual para la evaluacion automatica y para la manual.
+
+    [Fact]
+    public void MereceAviso_FirstTimeAtAnyLevelAboveOk_SaysYes()
+    {
+        var regla = Regla();
+
+        Assert.True(regla.MereceAviso(DemandLevel.WARNING, DateTime.UtcNow));
+        Assert.True(regla.MereceAviso(DemandLevel.EXCEEDED, DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void MereceAviso_LevelOk_SaysNo()
+    {
+        Assert.False(Regla().MereceAviso(DemandLevel.OK, DateTime.UtcNow));
+    }
+
+    [Fact]
+    public void MereceAviso_SameLevelWithinTheSilence_SaysNo()
+    {
+        var regla = Regla();
+        var ahora = DateTime.UtcNow;
+        regla.AnotarAviso(DemandLevel.WARNING, ahora);
+
+        Assert.False(regla.MereceAviso(DemandLevel.WARNING,
+            ahora + DemandRule.Silencio - TimeSpan.FromSeconds(1)));
+    }
+
+    [Fact]
+    public void MereceAviso_SameLevelOnceTheSilenceIsOver_SaysYes()
+    {
+        var regla = Regla();
+        var ahora = DateTime.UtcNow;
+        regla.AnotarAviso(DemandLevel.WARNING, ahora);
+
+        Assert.True(regla.MereceAviso(DemandLevel.WARNING, ahora + DemandRule.Silencio));
+    }
+
+    [Fact]
+    public void MereceAviso_LevelGetsWorseWithinTheSilence_SaysYes()
+    {
+        // Pasar de acercarse a superar lo contratado es noticia nueva: el cargo
+        // del mes acaba de quedar fijado y callarlo media hora no tiene sentido.
+        var regla = Regla();
+        var ahora = DateTime.UtcNow;
+        regla.AnotarAviso(DemandLevel.WARNING, ahora);
+
+        Assert.True(regla.MereceAviso(DemandLevel.EXCEEDED, ahora + TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public void MereceAviso_LevelImprovesWithinTheSilence_SaysNo()
+    {
+        var regla = Regla();
+        var ahora = DateTime.UtcNow;
+        regla.AnotarAviso(DemandLevel.EXCEEDED, ahora);
+
+        Assert.False(regla.MereceAviso(DemandLevel.WARNING, ahora + TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public void AnotarNormalidad_AfterAnAlert_LetsTheNextEpisodeWarnAtOnce()
+    {
+        // El episodio termino. Si no se olvidara el ultimo aviso, un pico nuevo
+        // diez minutos despues se quedaria sin avisar.
+        var regla = Regla();
+        var ahora = DateTime.UtcNow;
+        regla.AnotarAviso(DemandLevel.WARNING, ahora);
+
+        regla.AnotarNormalidad();
+
+        Assert.Null(regla.LastAlertLevel);
+        Assert.Null(regla.LastAlertAt);
+        Assert.True(regla.MereceAviso(DemandLevel.WARNING, ahora + TimeSpan.FromMinutes(1)));
+    }
 }
+
