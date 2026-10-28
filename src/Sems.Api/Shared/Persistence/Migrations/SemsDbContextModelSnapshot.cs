@@ -1025,6 +1025,10 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("FullName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1032,6 +1036,10 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.Property<string>("Role")
                         .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Segment")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 

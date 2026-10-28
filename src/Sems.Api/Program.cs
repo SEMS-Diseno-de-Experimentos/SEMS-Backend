@@ -175,6 +175,7 @@ builder.Services.AddScoped<IIamEventPublisher, InProcessIamEventPublisher>();
 builder.Services.AddScoped<IIamAcl, IamAcl>();
 builder.Services.AddScoped<AuthTokenService>();
 builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<AccountRecoveryService>();
 
 // ------------------------------------------------- consumidores de eventos

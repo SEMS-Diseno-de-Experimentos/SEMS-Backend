@@ -17,6 +17,10 @@ public sealed class UserConfig : IEntityTypeConfiguration<User>
         b.Property(u => u.PasswordHash).HasMaxLength(200).IsRequired();
         b.Property(u => u.Role).HasConversion<string>().HasMaxLength(20);
         b.Property(u => u.Status).HasMaxLength(20);
+        b.Property(u => u.FullName).HasMaxLength(120);
+        // Igual que el rol: el segmento se guarda por su nombre y no por su
+        // posicion, para que reordenar el enum no reinterprete las filas.
+        b.Property(u => u.Segment).HasConversion<string>().HasMaxLength(20);
         b.HasIndex(u => u.EmailAddress).IsUnique();
     }
 }
