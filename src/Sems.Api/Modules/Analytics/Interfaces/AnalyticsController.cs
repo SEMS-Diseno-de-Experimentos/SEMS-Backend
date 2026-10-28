@@ -18,8 +18,13 @@ namespace Sems.Api.Modules.Analytics.Interfaces;
 public sealed class AnalyticsController : ControllerBase
 {
     private readonly AnalyticsService _service;
+    private readonly InsightEngine _insights;
 
-    public AnalyticsController(AnalyticsService service) => _service = service;
+    public AnalyticsController(AnalyticsService service, InsightEngine insights)
+    {
+        _service = service;
+        _insights = insights;
+    }
 
     // ---------------------------------------------------- bill-predictions
 
@@ -113,6 +118,23 @@ public sealed class AnalyticsController : ControllerBase
         var created = await _service.CreateIdentificationAsync(r.UserId, r.DeviceId,
             r.PredictedDeviceType, r.ConfidenceScore, r.Status);
         return StatusCode(StatusCodes.Status201Created, DeviceIdentificationResponse.From(created));
+    }
+
+    // ------------------------------------------------------------ insights
+
+    /// <summary>
+    /// Recomputes the user's findings from the consumption measured so far.
+    /// </summary>
+    /// <remarks>
+    /// Las lecturas ya disparan este calculo por su cuenta; este endpoint esta
+    /// para no tener que esperarlo: lo usa el boton de "actualizar" de la
+    /// pantalla de analitica y las pruebas de extremo a extremo.
+    /// </remarks>
+    [HttpPost("insights/recompute")]
+    public async Task<InsightsResponse> Recompute([FromBody] RecomputeInsightsRequest r)
+    {
+        var hallazgos = await _insights.RecalcularAsync(r.UserId);
+        return InsightsResponse.From(hallazgos);
     }
 
     // -------------------------------------------- consumption-rankings
