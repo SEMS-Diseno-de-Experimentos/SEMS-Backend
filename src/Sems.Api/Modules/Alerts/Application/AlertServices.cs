@@ -60,10 +60,24 @@ public sealed class AlertCommandService
     {
         var levantadas = new List<Alert>();
 
+        var ahora = DateTime.UtcNow;
+
         foreach (var regla in await _demandRules.FindActiveBySiteIdAsync(siteId, ct))
         {
             var nivel = regla.Evaluar(demandaKw);
             if (nivel == DemandLevel.OK)
+            {
+                // El episodio termino: se limpia el silencio para que el
+                // siguiente pico avise sin esperar media hora.
+                regla.AnotarNormalidad();
+                await _demandRules.SaveAsync(regla, ct);
+                continue;
+            }
+
+            // Un medidor que reporta cada minuto evalua la regla cada minuto; sin
+            // este freno, un local trabajando al 90% generaria una alerta por
+            // lectura y el cliente dejaria de leerlas.
+            if (!regla.MereceAviso(nivel, ahora))
             {
                 continue;
             }
@@ -87,6 +101,9 @@ public sealed class AlertCommandService
             // este evento. Sin el, la alerta se guardaba pero nadie se enteraba.
             _bus.Publish(new DomainEvents.AlertTriggered(regla.UserId, alerta.AlertId, "DEMAND",
                 severidad, mensaje));
+
+            regla.AnotarAviso(nivel, ahora);
+            await _demandRules.SaveAsync(regla, ct);
 
             levantadas.Add(await _alerts.SaveAsync(alerta, ct));
         }

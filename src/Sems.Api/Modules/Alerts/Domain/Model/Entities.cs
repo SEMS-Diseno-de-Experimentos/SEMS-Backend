@@ -359,6 +359,12 @@ public class DemandRule
 
     public bool Active { get; private set; }
 
+    /// <summary>Nivel con el que se aviso la ultima vez. Null si nunca se aviso.</summary>
+    public DemandLevel? LastAlertLevel { get; private set; }
+
+    /// <summary>Cuando se aviso la ultima vez.</summary>
+    public DateTime? LastAlertAt { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
 
     public DateTime UpdatedAt { get; private set; }
@@ -366,6 +372,17 @@ public class DemandRule
     private DemandRule()
     {
     }
+
+    /// <summary>
+    /// Cuanto se calla la regla tras avisar del mismo nivel.
+    /// </summary>
+    /// <remarks>
+    /// Un medidor que reporta cada minuto dispararia sesenta alertas por hora
+    /// mientras el local trabaja al 90% de lo contratado, y el cliente dejaria
+    /// de leerlas. Media hora es suficiente para que el aviso siga siendo
+    /// accionable sin convertirse en ruido.
+    /// </remarks>
+    public static readonly TimeSpan Silencio = TimeSpan.FromMinutes(30);
 
     public static DemandRule Create(Guid siteId, Guid userId, string? ruleName,
         double contractedPowerKw, double? warningPercent, bool? active)
@@ -421,6 +438,52 @@ public class DemandRule
 
     /// <summary>Cuantos kW quedan hasta superar lo contratado. Negativo si ya se supero.</summary>
     public double MargenKw(double demandaKw) => ContractedPowerKw - demandaKw;
+
+    /// <summary>Si este nivel merece un aviso ahora, o si ya se dijo hace poco.</summary>
+    /// <remarks>
+    /// Empeorar siempre avisa: pasar de WARNING a EXCEEDED es noticia nueva
+    /// aunque el aviso anterior sea de hace un minuto. Repetir el mismo nivel
+    /// espera a que pase el silencio.
+    /// </remarks>
+    public bool MereceAviso(DemandLevel nivel, DateTime ahora)
+    {
+        if (nivel == DemandLevel.OK)
+        {
+            return false;
+        }
+        if (LastAlertLevel is null || LastAlertAt is null)
+        {
+            return true;
+        }
+        if (nivel > LastAlertLevel)
+        {
+            return true;
+        }
+        return ahora - LastAlertAt.Value >= Silencio;
+    }
+
+    /// <summary>Deja constancia de un aviso emitido.</summary>
+    public void AnotarAviso(DemandLevel nivel, DateTime ahora)
+    {
+        LastAlertLevel = nivel;
+        LastAlertAt = ahora;
+        UpdatedAt = ahora;
+    }
+
+    /// <summary>
+    /// La demanda volvio a la normalidad: se olvida el ultimo aviso para que el
+    /// siguiente episodio avise de inmediato y no espere el silencio.
+    /// </summary>
+    public void AnotarNormalidad()
+    {
+        if (LastAlertLevel is null)
+        {
+            return;
+        }
+        LastAlertLevel = null;
+        LastAlertAt = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
 
     public void UpdateDetails(string? ruleName, double contractedPowerKw, double warningPercent)
     {
