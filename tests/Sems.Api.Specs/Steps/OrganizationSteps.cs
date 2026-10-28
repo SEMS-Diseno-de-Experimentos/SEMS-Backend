@@ -78,6 +78,9 @@ public sealed class OrganizationSteps
     [Given(@"the organization has the site ""(.*)""")]
     public async Task GivenTheOrganizationHasTheSite(string code)
     {
+        // Los locales que un escenario da por puestos no deben chocar con el
+        // cupo del plan de entrada: el cupo tiene su propio escenario.
+        await Client.UseUnlimitedSitesPlanAsync(_world.SignedInUser.UserId);
         var site = await Client.CreateSiteAsync(OrganizationId, code);
         _world.Sites[code] = site.Id("site_id");
     }

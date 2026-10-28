@@ -167,6 +167,8 @@ public class OrganizationEndpointsTests : IClassFixture<SemsApiFactory>
     public async Task ArchiveSite_ExistingSite_Returns204AndLeavesTheListingButStaysQueryable()
     {
         var (admin, organizationId) = await AdminWithOrganizationAsync();
+        // Dos locales: el plan de entrada incluye uno solo.
+        await admin.Client.UseUnlimitedSitesPlanAsync(admin.UserId);
         await admin.Client.CreateSiteAsync(organizationId, "T-001");
         var archived = await admin.Client.CreateSiteAsync(organizationId, "T-002");
         var archivedId = archived.Id("site_id");

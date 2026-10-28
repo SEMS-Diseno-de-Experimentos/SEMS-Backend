@@ -1,5 +1,6 @@
 using Sems.Api.Modules.Organizations.Domain.Model;
 using Sems.Api.Modules.Organizations.Domain.Repositories;
+using Sems.Api.Modules.Organizations.Domain.Services;
 using Sems.Api.Shared.Errors;
 
 namespace Sems.Api.Modules.Organizations.Application;
@@ -13,14 +14,63 @@ public sealed class OrganizationCommandService
     private readonly ISiteRepository _sites;
     private readonly IZoneRepository _zones;
     private readonly IMembershipRepository _memberships;
+    private readonly IPlanAllowance? _planes;
 
     public OrganizationCommandService(IOrganizationRepository organizations, ISiteRepository sites,
-        IZoneRepository zones, IMembershipRepository memberships)
+        IZoneRepository zones, IMembershipRepository memberships, IPlanAllowance? planes = null)
     {
         _organizations = organizations;
         _sites = sites;
         _zones = zones;
         _memberships = memberships;
+        _planes = planes;
+    }
+
+    /// <summary>
+    /// Comprueba que al cliente le queda cupo de locales en su plan (US42).
+    /// </summary>
+    /// <remarks>
+    /// <para>El catalogo ya declaraba cuantos locales incluye cada plan, pero
+    /// nadie lo miraba: un cliente del plan de un local podia registrar veinte.
+    /// El cupo es justamente lo que distingue a los planes entre si, de modo
+    /// que sin esta comprobacion la diferencia entre pagar 29,90 y 129,90 era
+    /// ninguna.</para>
+    /// </remarks>
+    private async Task RequireSiteAllowanceAsync(Organization organizacion, CancellationToken ct)
+    {
+        if (_planes is null)
+        {
+            return;
+        }
+
+        // El plan lo contrata una persona, no la organizacion: el cupo es el de
+        // quien la administra. Si hay varios administradores vale el primero,
+        // que es quien la registro.
+        var administrador = (await _memberships.FindByOrganizationIdAsync(
+                organizacion.OrganizationId, ct))
+            .Where(v => v.Role == MembershipRole.ORG_ADMIN && v.IsActive)
+            .OrderBy(v => v.CreatedAt)
+            .FirstOrDefault();
+        if (administrador is null)
+        {
+            return;
+        }
+
+        var cupo = await _planes.SiteAllowanceForAsync(administrador.UserId, ct);
+        if (cupo is null)
+        {
+            // Sin suscripcion no se bloquea: quien esta probando el producto
+            // necesita poder registrar su primer local para ver que hace.
+            return;
+        }
+
+        var vigentes = (await _sites.FindByOrganizationIdAsync(organizacion.OrganizationId, ct)).Count;
+        if (vigentes >= cupo.SitesIncluded)
+        {
+            throw AppException.Conflict(
+                $"the {cupo.PlanName} plan includes {cupo.SitesIncluded} site(s); "
+                + "change the plan to register another one");
+        }
     }
 
     /// <summary>
@@ -81,6 +131,8 @@ public sealed class OrganizationCommandService
         {
             throw AppException.Conflict("a site with that site_code already exists in this organization");
         }
+
+        await RequireSiteAllowanceAsync(organizacion, ct);
 
         var local = Site.Register(organizationId, siteCode, name, address, district, floorAreaM2,
             contractedPowerKw, OrganizationEnums.ToTariffCategory(tariffCategory),
