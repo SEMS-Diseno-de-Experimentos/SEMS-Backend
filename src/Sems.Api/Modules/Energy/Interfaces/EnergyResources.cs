@@ -167,7 +167,14 @@ public static class EnergyResources
         [property: JsonPropertyName("excess_power_per_kw_month")] decimal ExcessPowerPerKwMonth,
         [property: JsonPropertyName("fixed_charge")] decimal FixedCharge,
         [property: JsonPropertyName("igv")] decimal Igv,
+        // Solo la franja, sin texto alrededor. Antes venia como
+        // "18:00-23:00 every day": una frase en ingles dentro de un campo de
+        // datos, que el cliente pintaba tal cual y remataba con su propio
+        // "todos los dias", de modo que la pantalla decia las dos cosas, en dos
+        // idiomas. La frecuencia va aparte, como bandera, y cada cliente la
+        // redacta en su idioma.
         [property: JsonPropertyName("peak_hours")] string PeakHours,
+        [property: JsonPropertyName("peak_every_day")] bool PeakEveryDay,
         [property: JsonPropertyName("in_peak_now")] bool InPeakNow,
         [property: JsonPropertyName("timestamp")] DateTime Timestamp)
     {
@@ -175,9 +182,11 @@ public static class EnergyResources
             t.Provider, t.TariffCategory, t.Currency, t.EnergiaPuntaPorKwh,
             t.EnergiaFueraDePuntaPorKwh, t.PotenciaPorKwMes, t.ExcesoDePotenciaPorKwMes,
             t.CargoFijoMensual, t.Igv,
-            // Todos los dias: el pliego solo excluye los domingos a solicitud del
-            // cliente, y esa exclusion es de cada suministro, no de la tarifa.
-            $"{HorarioPunta.HoraInicio:00}:00-{HorarioPunta.HoraFin:00}:00 every day",
+            $"{HorarioPunta.HoraInicio:00}:00-{HorarioPunta.HoraFin:00}:00",
+            // Todos los dias: el pliego solo excluye los domingos a solicitud
+            // del cliente, y esa exclusion es de cada suministro, no de la
+            // tarifa, asi que la tarifa por si sola no excluye ninguno.
+            true,
             HorarioPunta.EsHoraPunta(DateTime.UtcNow), t.Timestamp);
     }
 

@@ -59,4 +59,12 @@ public sealed class PeakHoursSteps
         Assert.Equal(HttpStatusCode.OK, _world.Response.StatusCode);
         Assert.Equal(peakHours, _world.LastBody.Text("peak_hours"));
     }
+
+    /// <summary>
+    /// La frecuencia viaja como bandera y no dentro del texto de la franja: el
+    /// cliente la redacta en su idioma.
+    /// </summary>
+    [Then(@"the tariff applies them every day")]
+    public void ThenTheTariffAppliesThemEveryDay() =>
+        Assert.True(_world.LastBody.GetProperty("peak_every_day").GetBoolean());
 }

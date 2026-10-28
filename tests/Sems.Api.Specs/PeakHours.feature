@@ -25,4 +25,5 @@ Feature: Peak hours of the commercial tariff
   Scenario: The published tariff states peak hours for every day
     Given a signed-in user
     When the user consults the "MT2" tariff
-    Then the peak hours are "18:00-23:00 every day"
+    Then the peak hours are "18:00-23:00"
+    And the tariff applies them every day

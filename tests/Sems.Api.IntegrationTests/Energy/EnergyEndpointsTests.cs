@@ -105,7 +105,10 @@ public class EnergyEndpointsTests : IClassFixture<SemsApiFactory>
             .ExpectAsync(HttpStatusCode.OK);
 
         Assert.Equal("MT2", tariff.Text("tariff_category"));
-        Assert.Equal("18:00-23:00 every day", tariff.Text("peak_hours"));
+        Assert.Equal("18:00-23:00", tariff.Text("peak_hours"));
+        // La frecuencia va como bandera: dentro del texto obligaba al cliente a
+        // pintar una frase en ingles junto a la suya.
+        Assert.True(tariff.GetProperty("peak_every_day").GetBoolean());
         Assert.Equal(58.40m, tariff.Number("power_per_kw_month"));
         Assert.Equal(87.60m, tariff.Number("excess_power_per_kw_month"));
     }

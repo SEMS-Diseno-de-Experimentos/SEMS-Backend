@@ -47,35 +47,48 @@ public sealed class PlanSeeder
         basico.AddFeature("CONSUMPTION_ALERTS", "Alertas de consumo", "enabled");
         basico.AddFeature("SITES_LIMIT", "Locales incluidos", "1");
         basico.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "10");
-        AddStripePrice(basico, "Stripe:Price:Free", "STRIPE_PRICE_FREE");
+        AddStripePrice(basico, "Stripe:Price:Basico", "STRIPE_PRICE_BASICO", "STRIPE_PRICE_FREE");
         await _plans.SaveAsync(basico, ct);
 
         var negocio = SubscriptionPlan.Create("Pro",
             "Para pequeñas cadenas, con control de demanda", 79.90, "PEN", "monthly");
-        negocio.AddFeature("BASIC_INCLUDED", "Todo lo de Básica", "enabled");
+        negocio.AddFeature("BASIC_INCLUDED", "Todo lo del plan Básico", "enabled");
         negocio.AddFeature("SITES_LIMIT", "Locales incluidos", "5");
         negocio.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "50");
         negocio.AddFeature("ZONE_ANALYTICS", "Consumo desglosado por zona", "enabled");
         negocio.AddFeature("DEMAND_ALERTS", "Aviso de demanda antes de superar potencia contratada", "enabled");
         negocio.AddFeature("PEAK_HOUR_REPORTS", "Reportes de consumo en hora punta", "enabled");
-        AddStripePrice(negocio, "Stripe:Price:Plus", "STRIPE_PRICE_PLUS");
+        AddStripePrice(negocio, "Stripe:Price:Pro", "STRIPE_PRICE_PRO_PLAN", "STRIPE_PRICE_PLUS");
         await _plans.SaveAsync(negocio, ct);
 
         var corporativo = SubscriptionPlan.Create("Enterprise",
             "Grandes cadenas, con benchmarking entre locales", 129.90, "PEN", "monthly");
-        corporativo.AddFeature("BUSINESS_INCLUDED", "Todo lo de Premium", "enabled");
+        corporativo.AddFeature("PRO_INCLUDED", "Todo lo del plan Pro", "enabled");
         corporativo.AddFeature("SITES_LIMIT", "Locales incluidos", "ilimitado");
         corporativo.AddFeature("DEVICES_PER_SITE_LIMIT", "Medidores por local", "ilimitado");
         corporativo.AddFeature("SITE_BENCHMARKING", "Benchmarking de eficiencia entre locales", "enabled");
         corporativo.AddFeature("TARIFF_OPTIMIZATION", "Análisis de categoría tarifaria", "enabled");
         corporativo.AddFeature("PRIORITY_SUPPORT", "Soporte prioritario", "enabled");
-        AddStripePrice(corporativo, "Stripe:Price:Pro", "STRIPE_PRICE_PRO");
+        AddStripePrice(corporativo, "Stripe:Price:Enterprise", "STRIPE_PRICE_ENTERPRISE", "STRIPE_PRICE_PRO");
         await _plans.SaveAsync(corporativo, ct);
     }
 
-    private void AddStripePrice(SubscriptionPlan plan, string configKey, string envKey)
+    /// <summary>
+    /// Ata el plan a su precio de Stripe, si esta configurado.
+    /// </summary>
+    /// <remarks>
+    /// <para>Se acepta tambien el nombre antiguo de la variable para no romper
+    /// un entorno que ya la tenga puesta. Los nombres viejos venian del catalogo
+    /// anterior (Free, Plus, Pro) y ya no decian la verdad: el plan Pro leia
+    /// <c>STRIPE_PRICE_PLUS</c> y Enterprise leia <c>STRIPE_PRICE_PRO</c>, de
+    /// modo que configurar "el precio de Pro" cobraba el de Enterprise.</para>
+    /// </remarks>
+    private void AddStripePrice(SubscriptionPlan plan, string configKey, string envKey,
+        string envKeyAntiguo)
     {
-        var priceId = _configuration[configKey] ?? Environment.GetEnvironmentVariable(envKey);
+        var priceId = _configuration[configKey]
+                      ?? Environment.GetEnvironmentVariable(envKey)
+                      ?? Environment.GetEnvironmentVariable(envKeyAntiguo);
         if (!string.IsNullOrWhiteSpace(priceId))
         {
             plan.AddFeature(PlanFeature.StripePriceIdCode, "Stripe price id", priceId);
