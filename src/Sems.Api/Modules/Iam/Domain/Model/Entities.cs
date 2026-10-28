@@ -61,6 +61,46 @@ public static class RoleNameExtensions
 }
 
 /// <summary>
+/// Segmento comercial del usuario, los dos a los que apunta el producto.
+/// </summary>
+/// <remarks>
+/// Es un dato del perfil, no un permiso: no decide lo que se puede hacer, solo
+/// con que cara se presenta la aplicacion.
+/// </remarks>
+public enum UserSegment
+{
+    /// <summary>Cadena con varios establecimientos.</summary>
+    RETAIL_CHAIN,
+
+    /// <summary>Establecimiento independiente.</summary>
+    INDEPENDENT
+}
+
+public static class UserSegmentExtensions
+{
+    /// <summary>
+    /// Acepta el valor tal como lo escribe el cliente, sin distinguir
+    /// mayusculas ni espacios.
+    /// </summary>
+    /// <remarks>
+    /// Devuelve null cuando no viene nada, porque el segmento es opcional: el
+    /// alta funciona igual sin declararlo.
+    /// </remarks>
+    public static UserSegment? ToUserSegment(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+        var normalizado = value.Trim().ToUpperInvariant().Replace('-', '_');
+        return Enum.TryParse<UserSegment>(normalizado, out var segmento)
+               && Enum.IsDefined(segmento)
+            ? segmento
+            : throw AppException.Validation("segment must be one of RETAIL_CHAIN, INDEPENDENT");
+    }
+}
+
+/// <summary>
 /// Usuario del sistema.
 ///
 /// <para>La contrasena solo existe aqui como resumen: el valor en claro nunca se
@@ -83,6 +123,19 @@ public class User
     /// </summary>
     public string? Status { get; private set; }
 
+    /// <summary>
+    /// Nombre con el que la persona quiere que se la llame. Opcional.
+    /// </summary>
+    /// <remarks>
+    /// Lo guarda el backend y no el navegador: antes el nombre que el usuario
+    /// escribia al registrarse solo vivia en ese equipo, asi que entrar desde
+    /// otro lo perdia y el saludo salia con la parte local del correo.
+    /// </remarks>
+    public string? FullName { get; private set; }
+
+    /// <summary>Segmento comercial declarado. Opcional.</summary>
+    public UserSegment? Segment { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -91,7 +144,7 @@ public class User
     }
 
     public static User Register(EmailAddress email, string passwordHash, RoleName role,
-        bool requireVerification)
+        bool requireVerification, string? fullName = null, UserSegment? segment = null)
     {
         var now = DateTime.UtcNow;
         return new User
@@ -100,10 +153,35 @@ public class User
             EmailAddress = email.Value,
             PasswordHash = passwordHash,
             Role = role,
+            FullName = Limpio(fullName),
+            Segment = segment,
             Status = requireVerification ? StatusPending : StatusActive,
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    /// <summary>Cambia el nombre y el segmento. Ambos pueden quedar vacios.</summary>
+    public void UpdateProfile(string? fullName, UserSegment? segment)
+    {
+        FullName = Limpio(fullName);
+        Segment = segment;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>Un nombre en blanco es lo mismo que no tener nombre.</summary>
+    private static string? Limpio(string? valor)
+    {
+        var nombre = valor?.Trim();
+        if (string.IsNullOrEmpty(nombre))
+        {
+            return null;
+        }
+        if (nombre.Length > 120)
+        {
+            throw AppException.Validation("full_name must be at most 120 characters");
+        }
+        return nombre;
     }
 
     public bool IsPending => string.Equals(Status, StatusPending, StringComparison.OrdinalIgnoreCase);
