@@ -259,4 +259,85 @@ public class OrganizationEndpointsTests : IClassFixture<SemsApiFactory>
         Assert.Equal("ACTIVE", regranted.Text("status"));
         Assert.Equal("OPERATOR", regranted.Text("role"));
     }
+
+    // ------------------------------------------------- acceso por correo
+    //
+    // Quien administra una cadena conoce el correo de sus companeros, no su
+    // UUID. Exigir el identificador dejaba la pantalla de accesos inservible
+    // sin consultar la base de datos a mano.
+
+    [Fact]
+    public async Task GrantMembership_ByEmail_Returns201WithTheResolvedUser()
+    {
+        var (admin, organizationId) = await AdminWithOrganizationAsync();
+        var supervisor = await _factory.CreateUserAsync();
+        var site = await admin.Client.CreateSiteAsync(organizationId, "T-001");
+
+        var granted = await (await admin.Client.PostJsonAsync(
+                $"/api/v1/organizations/{organizationId}/members",
+                new { email = supervisor.Email, role = "SUPERVISOR", site_id = site.Text("site_id") }))
+            .ExpectAsync(HttpStatusCode.Created);
+
+        Assert.Equal(supervisor.UserId, granted.Id("user_id"));
+        Assert.Equal(supervisor.Email, granted.Text("email"));
+        Assert.Equal("SUPERVISOR", granted.Text("role"));
+    }
+
+    [Fact]
+    public async Task GrantMembership_ByEmailInAnotherCase_StillFindsTheAccount()
+    {
+        var (admin, organizationId) = await AdminWithOrganizationAsync();
+        var operatorUser = await _factory.CreateUserAsync();
+
+        var granted = await (await admin.Client.PostJsonAsync(
+                $"/api/v1/organizations/{organizationId}/members",
+                new { email = operatorUser.Email.ToUpperInvariant(), role = "OPERATOR" }))
+            .ExpectAsync(HttpStatusCode.Created);
+
+        Assert.Equal(operatorUser.UserId, granted.Id("user_id"));
+    }
+
+    [Fact]
+    public async Task GrantMembership_EmailOfNobody_Returns404()
+    {
+        // La peticion esta bien formada: lo que falta es que esa persona se
+        // registre, y eso es un 404, no un 400.
+        var (admin, organizationId) = await AdminWithOrganizationAsync();
+
+        var response = await admin.Client.PostJsonAsync(
+            $"/api/v1/organizations/{organizationId}/members",
+            new { email = "nadie@energix.test", role = "OPERATOR" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GrantMembership_WithoutEmailOrUserId_Returns400()
+    {
+        var (admin, organizationId) = await AdminWithOrganizationAsync();
+
+        var response = await admin.Client.PostJsonAsync(
+            $"/api/v1/organizations/{organizationId}/members", new { role = "OPERATOR" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListMembers_AnyOrganization_NamesEachPersonByTheirEmail()
+    {
+        // Sin el correo la pantalla listaba UUIDs y no habia forma de saber a
+        // quien se le estaba quitando el acceso.
+        var (admin, organizationId) = await AdminWithOrganizationAsync();
+        var operatorUser = await _factory.CreateUserAsync();
+        await (await admin.Client.PostJsonAsync($"/api/v1/organizations/{organizationId}/members",
+                new { email = operatorUser.Email, role = "OPERATOR" }))
+            .ExpectAsync(HttpStatusCode.Created);
+
+        var members = await (await admin.Client.GetAsync(
+                $"/api/v1/organizations/{organizationId}/members")).ExpectAsync(HttpStatusCode.OK);
+
+        Assert.Equal(new[] { admin.Email, operatorUser.Email }.OrderBy(e => e),
+            members.EnumerateArray().Select(m => m.Text("email")).OrderBy(e => e));
+    }
 }
+
