@@ -18,6 +18,7 @@ public class EnergyCommandServiceTests
     private readonly IEnergyMeterRepository _meters = Substitute.For<IEnergyMeterRepository>();
     private readonly IEnergyReadingRepository _readings = Substitute.For<IEnergyReadingRepository>();
     private readonly IEnergyPricingProvider _pricing = Substitute.For<IEnergyPricingProvider>();
+    private readonly ISiteCatalog _sites = Substitute.For<ISiteCatalog>();
     private readonly IDomainEventBus _bus = Substitute.For<IDomainEventBus>();
     private readonly EnergyCommandService _service;
 
@@ -31,9 +32,17 @@ public class EnergyCommandServiceTests
         _readings.SaveAsync(Arg.Any<EnergyReading>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<EnergyReading>());
 
+        // El local existe y esta vigente salvo que un test diga lo contrario:
+        // casi ninguno habla de locales, y obligarlos a prepararlo esconderia
+        // lo que si estan comprobando.
+        _sites.SiteExistsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+        _sites.SiteIsActiveAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+        _sites.ZoneBelongsToSiteAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+
         _service = new EnergyCommandService(_meters, _readings,
             Substitute.For<IConsumptionAlertRepository>(), Substitute.For<IUserGoalRepository>(),
-            _pricing, _bus);
+            _pricing, _sites, _bus);
     }
 
     // ------------------------------------------------------- factura estimada
@@ -133,12 +142,13 @@ public class EnergyCommandServiceTests
     [Fact]
     public async Task RegisterMeterAsync_RepeatedSerialNumber_ThrowsConflict()
     {
-        var existing = EnergyMeter.Register(Guid.NewGuid().ToString(), "EOS-0001", null, null, null,
-            null, null);
+        var existing = EnergyMeter.Register(Guid.NewGuid().ToString(), Guid.NewGuid(), null,
+            "EOS-0001", null, null, null, null, null);
         _meters.FindBySerialAsync("EOS-0001", Arg.Any<CancellationToken>()).Returns(existing);
 
         var error = await Assert.ThrowsAsync<AppException>(() => _service.RegisterMeterAsync(
-            Guid.NewGuid().ToString(), " EOS-0001 ", "EOS-3F", "EOS", null, null, null));
+            Guid.NewGuid().ToString(), Guid.NewGuid(), null, " EOS-0001 ", "EOS-3F", "EOS", null,
+            null, null));
 
         Assert.Equal(ErrorCode.CONFLICT, error.Code);
         await _meters.DidNotReceive().SaveAsync(Arg.Any<EnergyMeter>(), Arg.Any<CancellationToken>());
@@ -147,8 +157,8 @@ public class EnergyCommandServiceTests
     [Fact]
     public async Task RegisterMeterAsync_NewSerialNumber_IsRegisteredActive()
     {
-        var meter = await _service.RegisterMeterAsync(Guid.NewGuid().ToString(), "EOS-0002", "EOS-3F",
-            "EOS", "Main board", null, null);
+        var meter = await _service.RegisterMeterAsync(Guid.NewGuid().ToString(), Guid.NewGuid(),
+            null, "EOS-0002", "EOS-3F", "EOS", "Main board", null, null);
 
         Assert.Equal(MeterStatus.active, meter.Status);
         Assert.Equal("1.0.0", meter.FirmwareVersion);

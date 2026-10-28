@@ -114,6 +114,8 @@ public sealed class AuthenticationService
         // 2. Create a default Energy Meter
         var meter = await _energy.RegisterMeterAsync(
             userId.ToString(),
+            site.SiteId,
+            null,
             $"METER-{random.Next(10000, 99999)}",
             "SmartMeter V1",
             "EOS",
