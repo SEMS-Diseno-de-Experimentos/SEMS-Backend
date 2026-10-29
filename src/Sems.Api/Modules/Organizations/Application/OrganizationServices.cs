@@ -38,29 +38,10 @@ public sealed class OrganizationCommandService
     /// </remarks>
     private async Task RequireSiteAllowanceAsync(Organization organizacion, CancellationToken ct)
     {
-        if (_planes is null)
-        {
-            return;
-        }
-
-        // El plan lo contrata una persona, no la organizacion: el cupo es el de
-        // quien la administra. Si hay varios administradores vale el primero,
-        // que es quien la registro.
-        var administrador = (await _memberships.FindByOrganizationIdAsync(
-                organizacion.OrganizationId, ct))
-            .Where(v => v.Role == MembershipRole.ORG_ADMIN && v.IsActive)
-            .OrderBy(v => v.CreatedAt)
-            .FirstOrDefault();
-        if (administrador is null)
-        {
-            return;
-        }
-
-        var cupo = await _planes.SiteAllowanceForAsync(administrador.UserId, ct);
+        var cupo = await PlanDeLaOrganizacion.ResolverAsync(organizacion.OrganizationId,
+            _memberships, _planes, ct);
         if (cupo is null)
         {
-            // Sin suscripcion no se bloquea: quien esta probando el producto
-            // necesita poder registrar su primer local para ver que hace.
             return;
         }
 
@@ -267,14 +248,36 @@ public sealed class OrganizationQueryService
     private readonly ISiteRepository _sites;
     private readonly IZoneRepository _zones;
     private readonly IMembershipRepository _memberships;
+    private readonly IPlanAllowance? _planes;
 
     public OrganizationQueryService(IOrganizationRepository organizations, ISiteRepository sites,
-        IZoneRepository zones, IMembershipRepository memberships)
+        IZoneRepository zones, IMembershipRepository memberships, IPlanAllowance? planes = null)
     {
         _organizations = organizations;
         _sites = sites;
         _zones = zones;
         _memberships = memberships;
+        _planes = planes;
+    }
+
+    /// <summary>
+    /// Cuantos medidores admite el local segun el plan, y en que plan.
+    /// </summary>
+    /// <remarks>
+    /// <para>La contesta organizaciones y no energia porque la cadena que lleva
+    /// del local al plan —local, organizacion, administrador, suscripcion— es
+    /// suya. Energia solo necesita el numero.</para>
+    ///
+    /// <para>Null significa que no hay cupo que exigir: el local no existe, su
+    /// organizacion no tiene administrador activo, o este no tiene plan.</para>
+    /// </remarks>
+    public async Task<IPlanAllowance.PlanAllowance?> MeterAllowanceOfSiteAsync(Guid siteId,
+        CancellationToken ct = default)
+    {
+        var local = await _sites.FindByIdAsync(siteId, ct);
+        return local is null
+            ? null
+            : await PlanDeLaOrganizacion.ResolverAsync(local.OrganizationId, _memberships, _planes, ct);
     }
 
     public async Task<Organization> GetAsync(Guid organizationId, CancellationToken ct = default) =>
@@ -313,3 +316,46 @@ public sealed class OrganizationQueryService
         return resultado;
     }
 }
+
+/// <summary>
+/// Resuelve que plan rige en una organizacion.
+/// </summary>
+/// <remarks>
+/// <para>El plan lo contrata una persona, no la organizacion: el cupo es el de
+/// quien la administra, y si hay varios administradores vale el primero, que
+/// es quien la registro.</para>
+///
+/// <para>Vive aparte porque lo necesitan dos sitios —el alta de locales y la
+/// consulta que hace energia antes de aceptar un medidor— y si la regla se
+/// copiara en los dos, cambiarla en uno dejaria el otro mintiendo.</para>
+/// </remarks>
+internal static class PlanDeLaOrganizacion
+{
+    /// <summary>
+    /// Cupos que rigen en la organizacion, o null si no hay nada que exigir.
+    /// </summary>
+    /// <remarks>
+    /// Devuelve null cuando no hay adaptador de planes, cuando la organizacion
+    /// no tiene administrador activo o cuando este no tiene suscripcion. Sin
+    /// suscripcion no se bloquea: quien esta probando el producto necesita
+    /// poder registrar su primer local para ver que hace.
+    /// </remarks>
+    public static async Task<IPlanAllowance.PlanAllowance?> ResolverAsync(Guid organizationId,
+        IMembershipRepository memberships, IPlanAllowance? planes, CancellationToken ct)
+    {
+        if (planes is null)
+        {
+            return null;
+        }
+
+        var administrador = (await memberships.FindByOrganizationIdAsync(organizationId, ct))
+            .Where(v => v.Role == MembershipRole.ORG_ADMIN && v.IsActive)
+            .OrderBy(v => v.CreatedAt)
+            .FirstOrDefault();
+
+        return administrador is null
+            ? null
+            : await planes.AllowanceForAsync(administrador.UserId, ct);
+    }
+}
+

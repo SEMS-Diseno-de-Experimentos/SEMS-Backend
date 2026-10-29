@@ -165,4 +165,54 @@ public class EnergyEndpointsTests : IClassFixture<SemsApiFactory>
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    // -------------------------------------------- cupo de medidores del plan
+
+    [Fact]
+    public async Task PostMeter_BeyondWhatThePlanIncludes_Returns409()
+    {
+        // El plan de entrada incluye diez medidores por local. El numero once
+        // no entra: sin esto, pagar 29,90 o 129,90 daba lo mismo.
+        var user = await _factory.CreateUserAsync();
+        var siteId = await user.Client.CreateSiteForAsync(user.UserId);
+
+        for (var i = 0; i < 10; i++)
+        {
+            await (await user.Client.PostMeterAsync(user.UserId, $"EOS-{Guid.NewGuid():N}", siteId))
+                .ExpectAsync(HttpStatusCode.Created);
+        }
+
+        var response = await user.Client.PostMeterAsync(user.UserId, $"EOS-{Guid.NewGuid():N}",
+            siteId);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var cuerpo = await response.ReadJsonAsync();
+        Assert.Contains("10 meter(s) per site", cuerpo.Text("message"));
+        Assert.Contains("Básico", cuerpo.Text("message"));
+    }
+
+    [Fact]
+    public async Task PostMeter_AfterDeactivatingOne_FitsAgain()
+    {
+        // US23: el medidor retirado deja de contar en el cupo.
+        var user = await _factory.CreateUserAsync();
+        var siteId = await user.Client.CreateSiteForAsync(user.UserId);
+
+        string? primero = null;
+        for (var i = 0; i < 10; i++)
+        {
+            var creado = await (await user.Client.PostMeterAsync(user.UserId,
+                $"EOS-{Guid.NewGuid():N}", siteId)).ExpectAsync(HttpStatusCode.Created);
+            primero ??= creado.Text("id");
+        }
+
+        await (await user.Client.PatchAsync($"/api/v1/energy-meters/{primero}/deactivate", null))
+            .ExpectAsync(HttpStatusCode.OK);
+
+        var response = await user.Client.PostMeterAsync(user.UserId, $"EOS-{Guid.NewGuid():N}",
+            siteId);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
 }
+
