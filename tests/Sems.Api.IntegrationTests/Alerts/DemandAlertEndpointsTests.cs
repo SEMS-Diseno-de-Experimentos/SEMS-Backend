@@ -123,4 +123,40 @@ public class DemandAlertEndpointsTests : IClassFixture<SemsApiFactory>
         Assert.Equal("resolved", resolved.Text("status"));
         Assert.Equal(System.Text.Json.JsonValueKind.String, resolved.GetProperty("resolved_at").ValueKind);
     }
+
+    [Fact]
+    public async Task DemandEvaluation_AnyAlert_CarriesTheNumbersAndTheHeadroomInSnakeCase()
+    {
+        // Sin esto el cliente solo tenia una frase en ingles: para escribirla
+        // en espanol tenia que leer "The site is at 112 kW of 120 kW".
+        var (manager, siteId) = await ManagerWithSiteAsync();
+        await (await manager.Client.PostDemandRuleAsync(siteId, manager.UserId, 120, 85))
+            .ExpectAsync(HttpStatusCode.Created);
+
+        var levantadas = await (await manager.Client.PostDemandEvaluationAsync(siteId, 112))
+            .ExpectAsync(HttpStatusCode.OK);
+
+        var alerta = Assert.Single(levantadas.EnumerateArray());
+        Assert.Equal("DEMAND", alerta.Text("alert_type"));
+        Assert.Equal(siteId.ToString(), alerta.Text("site_id"));
+        Assert.Equal(112d, alerta.GetProperty("measured_kw").GetDouble());
+        Assert.Equal(120d, alerta.GetProperty("contracted_kw").GetDouble());
+        Assert.Equal(8d, alerta.GetProperty("headroom_kw").GetDouble());
+    }
+
+    [Fact]
+    public async Task DemandEvaluation_AboveTheContractedPower_TheHeadroomIsNegative()
+    {
+        var (manager, siteId) = await ManagerWithSiteAsync();
+        await (await manager.Client.PostDemandRuleAsync(siteId, manager.UserId, 120, 85))
+            .ExpectAsync(HttpStatusCode.Created);
+
+        var levantadas = await (await manager.Client.PostDemandEvaluationAsync(siteId, 135))
+            .ExpectAsync(HttpStatusCode.OK);
+
+        var alerta = Assert.Single(levantadas.EnumerateArray());
+        Assert.Equal("CRITICAL", alerta.Text("severity"));
+        Assert.Equal(-15d, alerta.GetProperty("headroom_kw").GetDouble());
+    }
 }
+

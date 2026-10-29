@@ -90,6 +90,23 @@ public class Alert
     public DateTime TriggeredAt { get; private set; }
     public DateTime? ResolvedAt { get; private set; }
 
+    // --- el dato detras del aviso ---
+    //
+    // El titulo y el mensaje son una frase en ingles, y el cliente los pinta
+    // tal cual: una interfaz en espanol acaba mostrando "Demand close to the
+    // contracted limit". Guardar aparte los numeros que dispararon la alerta
+    // permite que cada cliente escriba la frase en su idioma, y de paso que la
+    // pantalla los use para algo mas que leerlos.
+
+    /// <summary>Local al que se refiere el aviso. Solo en las de demanda.</summary>
+    public Guid? SiteId { get; private set; }
+
+    /// <summary>Demanda medida, en kW. Solo en las de demanda.</summary>
+    public double? MeasuredKw { get; private set; }
+
+    /// <summary>Potencia contratada del local, en kW. Solo en las de demanda.</summary>
+    public double? ContractedKw { get; private set; }
+
     private Alert()
     {
     }
@@ -110,6 +127,25 @@ public class Alert
         Status = string.IsNullOrWhiteSpace(status) ? StatusActive : status,
         TriggeredAt = triggeredAt ?? DateTime.UtcNow
     };
+
+    /// <summary>
+    /// Aviso de demanda, con los numeros que lo justifican.
+    /// </summary>
+    /// <remarks>
+    /// La severidad distingue acercarse de haber superado lo contratado, y de
+    /// <c>MeasuredKw</c> y <c>ContractedKw</c> sale el margen que queda, asi
+    /// que el cliente puede redactar el aviso sin leer el mensaje.
+    /// </remarks>
+    public static Alert RaiseDemand(Guid userId, Guid siteId, string title, string message,
+        string severity, double measuredKw, double contractedKw)
+    {
+        var alerta = Raise(userId, null, null, null, "DEMAND", title, message, severity, null,
+            DateTime.UtcNow);
+        alerta.SiteId = siteId;
+        alerta.MeasuredKw = measuredKw;
+        alerta.ContractedKw = contractedKw;
+        return alerta;
+    }
 
     /// <summary>Al pasar a resuelta se sella la fecha si el cliente no la envio.</summary>
     public void UpdateStatus(string newStatus, DateTime? resolvedAt)

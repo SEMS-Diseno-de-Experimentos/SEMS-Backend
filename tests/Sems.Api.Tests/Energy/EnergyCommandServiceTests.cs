@@ -20,6 +20,7 @@ public class EnergyCommandServiceTests
     private readonly IEnergyPricingProvider _pricing = Substitute.For<IEnergyPricingProvider>();
     private readonly ISiteCatalog _sites = Substitute.For<ISiteCatalog>();
     private readonly IDomainEventBus _bus = Substitute.For<IDomainEventBus>();
+    private readonly IMeterAllowance _cupos = Substitute.For<IMeterAllowance>();
     private readonly EnergyCommandService _service;
 
     public EnergyCommandServiceTests()
@@ -40,9 +41,16 @@ public class EnergyCommandServiceTests
         _sites.ZoneBelongsToSiteAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(true);
 
+        // Sin cupo declarado no se bloquea nada: lo contrario obligaria a cada
+        // test a preparar un plan para hablar de otra cosa.
+        _cupos.MeterAllowanceOfSiteAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns((IMeterAllowance.MeterAllowance?)null);
+        _meters.FindBySiteIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(new List<EnergyMeter>());
+
         _service = new EnergyCommandService(_meters, _readings,
             Substitute.For<IConsumptionAlertRepository>(), Substitute.For<IUserGoalRepository>(),
-            _pricing, _sites, _bus);
+            _pricing, _sites, _bus, _cupos);
     }
 
     // ------------------------------------------------------- factura estimada
@@ -164,4 +172,100 @@ public class EnergyCommandServiceTests
         Assert.Equal("1.0.0", meter.FirmwareVersion);
         await _meters.Received(1).SaveAsync(meter, Arg.Any<CancellationToken>());
     }
+
+    // ------------------------------------------------- cupo de medidores
+    //
+    // El catalogo vende "10 / 50 / ilimitado medidores por local" y hasta ahora
+    // nadie lo miraba: un cliente del plan mas barato podia instalar los que
+    // quisiera, con lo que el cupo dejaba de distinguir a un plan de otro.
+
+    private static EnergyMeter Medidor(Guid local, MeterStatus estado = MeterStatus.active)
+    {
+        var medidor = EnergyMeter.Register("u-1", local, null, $"EOS-{Guid.NewGuid():N}", "V1",
+            "EOS", "Tablero", "1.0.0", 100000);
+        if (estado == MeterStatus.inactive)
+        {
+            medidor.Deactivate();
+        }
+        return medidor;
+    }
+
+    private void Cupo(Guid local, int medidores, string plan = "Básico") =>
+        _cupos.MeterAllowanceOfSiteAsync(local, Arg.Any<CancellationToken>())
+            .Returns(new IMeterAllowance.MeterAllowance(medidores, plan));
+
+    private void YaInstalados(Guid local, params EnergyMeter[] medidores) =>
+        _meters.FindBySiteIdAsync(local, Arg.Any<CancellationToken>()).Returns(medidores.ToList());
+
+    [Fact]
+    public async Task RegisterMeterAsync_WithRoomLeftInThePlan_Registers()
+    {
+        var local = Guid.NewGuid();
+        Cupo(local, 2);
+        YaInstalados(local, Medidor(local));
+
+        var medidor = await _service.RegisterMeterAsync("u-1", local, null, "EOS-NUEVO", null, null,
+            null, null, 100000);
+
+        Assert.Equal(local, medidor.SiteId);
+    }
+
+    [Fact]
+    public async Task RegisterMeterAsync_PlanQuotaReached_FailsSayingWhichPlanAndHowMany()
+    {
+        var local = Guid.NewGuid();
+        Cupo(local, 2);
+        YaInstalados(local, Medidor(local), Medidor(local));
+
+        var error = await Assert.ThrowsAsync<AppException>(() => _service.RegisterMeterAsync(
+            "u-1", local, null, "EOS-DEMAS", null, null, null, null, 100000));
+
+        Assert.Equal(ErrorCode.CONFLICT, error.Code);
+        Assert.Contains("Básico", error.Message);
+        Assert.Contains("2 meter(s) per site", error.Message);
+    }
+
+    [Fact]
+    public async Task RegisterMeterAsync_DeactivatedMetersDoNotTakeUpRoom()
+    {
+        // Es lo que promete US23: dar de baja un medidor retirado lo saca del
+        // cupo. Si siguiera contando, el cliente tendria que cambiar de plan
+        // por un aparato que ya no existe.
+        var local = Guid.NewGuid();
+        Cupo(local, 2);
+        YaInstalados(local, Medidor(local), Medidor(local, MeterStatus.inactive));
+
+        var medidor = await _service.RegisterMeterAsync("u-1", local, null, "EOS-REPUESTO", null,
+            null, null, null, 100000);
+
+        Assert.Equal(local, medidor.SiteId);
+    }
+
+    [Fact]
+    public async Task RegisterMeterAsync_UnlimitedPlan_NeverBlocks()
+    {
+        var local = Guid.NewGuid();
+        Cupo(local, int.MaxValue, "Enterprise");
+        YaInstalados(local, Enumerable.Range(0, 50).Select(_ => Medidor(local)).ToArray());
+
+        var medidor = await _service.RegisterMeterAsync("u-1", local, null, "EOS-51", null, null,
+            null, null, 100000);
+
+        Assert.Equal(local, medidor.SiteId);
+    }
+
+    [Fact]
+    public async Task RegisterMeterAsync_SiteWithoutAPlanBehind_IsNotBlocked()
+    {
+        // Quien esta probando el producto tiene que poder instalar su primer
+        // medidor antes de contratar nada.
+        var local = Guid.NewGuid();
+        YaInstalados(local, Medidor(local), Medidor(local));
+
+        var medidor = await _service.RegisterMeterAsync("u-1", local, null, "EOS-PRUEBA", null,
+            null, null, null, 100000);
+
+        Assert.Equal(local, medidor.SiteId);
+    }
 }
+

@@ -15,11 +15,12 @@ public sealed class EnergyCommandService
     private readonly IUserGoalRepository _goals;
     private readonly IEnergyPricingProvider _pricing;
     private readonly ISiteCatalog _sites;
+    private readonly IMeterAllowance? _cupos;
     private readonly IDomainEventBus _bus;
 
     public EnergyCommandService(IEnergyMeterRepository meters, IEnergyReadingRepository readings,
         IConsumptionAlertRepository alerts, IUserGoalRepository goals, IEnergyPricingProvider pricing,
-        ISiteCatalog sites, IDomainEventBus bus)
+        ISiteCatalog sites, IDomainEventBus bus, IMeterAllowance? cupos = null)
     {
         _meters = meters;
         _readings = readings;
@@ -27,7 +28,42 @@ public sealed class EnergyCommandService
         _goals = goals;
         _pricing = pricing;
         _sites = sites;
+        _cupos = cupos;
         _bus = bus;
+    }
+
+    /// <summary>
+    /// Comprueba que al local le queda cupo de medidores en su plan.
+    /// </summary>
+    /// <remarks>
+    /// <para>Se cuentan solo los vigentes: un medidor dado de baja ya no ocupa
+    /// sitio, que es justo lo que promete US23.</para>
+    ///
+    /// <para>Sin adaptador de cupos, o sin plan detras del local, no se
+    /// bloquea nada. Es el mismo criterio que con los locales: quien esta
+    /// probando el producto tiene que poder instalar su primer medidor.</para>
+    /// </remarks>
+    private async Task RequireMeterAllowanceAsync(Guid siteId, CancellationToken ct)
+    {
+        if (_cupos is null)
+        {
+            return;
+        }
+
+        var cupo = await _cupos.MeterAllowanceOfSiteAsync(siteId, ct);
+        if (cupo is null)
+        {
+            return;
+        }
+
+        var instalados = (await _meters.FindBySiteIdAsync(siteId, ct))
+            .Count(m => m.Status != MeterStatus.inactive);
+        if (instalados >= cupo.MetersIncluded)
+        {
+            throw AppException.Conflict(
+                $"the {cupo.PlanName} plan includes {cupo.MetersIncluded} meter(s) per site; "
+                + "change the plan to register another one");
+        }
     }
 
     /// <summary>
@@ -83,6 +119,7 @@ public sealed class EnergyCommandService
         }
         await RequireActiveSiteAsync(siteId, ct);
         await RequireZoneOfSiteAsync(zoneId, siteId, ct);
+        await RequireMeterAllowanceAsync(siteId, ct);
 
         return await _meters.SaveAsync(EnergyMeter.Register(userId, siteId, zoneId, meterSerial,
             model, brand, location, firmwareVersion, maxPowerWatts), ct);

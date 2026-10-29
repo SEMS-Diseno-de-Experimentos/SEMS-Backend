@@ -16,6 +16,9 @@ public sealed class SubscriptionsPlanAllowance : IPlanAllowance
     /// <summary>Codigo de la caracteristica que declara el cupo de locales.</summary>
     private const string SitesLimit = "SITES_LIMIT";
 
+    /// <summary>Y el de la que declara cuantos medidores admite cada local.</summary>
+    private const string MetersLimit = "DEVICES_PER_SITE_LIMIT";
+
     private readonly ISubscriptionRepository _subscriptions;
     private readonly IPlanRepository _plans;
 
@@ -25,7 +28,7 @@ public sealed class SubscriptionsPlanAllowance : IPlanAllowance
         _plans = plans;
     }
 
-    public async Task<IPlanAllowance.SiteAllowance?> SiteAllowanceForAsync(Guid userId,
+    public async Task<IPlanAllowance.PlanAllowance?> AllowanceForAsync(Guid userId,
         CancellationToken ct = default)
     {
         var suscripciones = await _subscriptions.FindByUserIdAsync(userId.ToString(), ct);
@@ -41,12 +44,16 @@ public sealed class SubscriptionsPlanAllowance : IPlanAllowance
             return null;
         }
 
-        var declarado = plan.PlanFeatures
-            .FirstOrDefault(f => string.Equals(f.FeatureCode, SitesLimit,
-                StringComparison.OrdinalIgnoreCase))?.FeatureValue;
-
-        return new IPlanAllowance.SiteAllowance(Interpretar(declarado), plan.Name);
+        return new IPlanAllowance.PlanAllowance(
+            Interpretar(Declarado(plan, SitesLimit)),
+            Interpretar(Declarado(plan, MetersLimit)),
+            plan.Name);
     }
+
+    private static string? Declarado(SubscriptionPlan plan, string codigo) =>
+        plan.PlanFeatures
+            .FirstOrDefault(f => string.Equals(f.FeatureCode, codigo,
+                StringComparison.OrdinalIgnoreCase))?.FeatureValue;
 
     /// <summary>
     /// Traduce el valor declarado en el plan a un numero de locales.

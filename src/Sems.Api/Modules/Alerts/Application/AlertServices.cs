@@ -94,8 +94,8 @@ public sealed class AlertCommandService
                    + "the whole month.",
                    "CRITICAL");
 
-            var alerta = Alert.Raise(regla.UserId, null, null, null, "DEMAND", titulo, mensaje,
-                severidad, null, DateTime.UtcNow);
+            var alerta = Alert.RaiseDemand(regla.UserId, regla.SiteId, titulo, mensaje, severidad,
+                demandaKw, regla.ContractedPowerKw);
 
             // Igual que el resto de alertas: el correo lo envia quien escucha
             // este evento. Sin el, la alerta se guardaba pero nadie se enteraba.

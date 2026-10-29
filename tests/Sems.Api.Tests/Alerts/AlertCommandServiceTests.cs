@@ -138,4 +138,33 @@ public class AlertCommandServiceTests
         await _inactivityRules.DidNotReceive().SaveAsync(Arg.Any<InactivityRule>(),
             Arg.Any<CancellationToken>());
     }
+
+    // ------------------------------------------- el dato detras del aviso
+    //
+    // El titulo y el mensaje van en ingles y el cliente los pinta tal cual, de
+    // modo que una interfaz en espanol mostraba "Demand close to the
+    // contracted limit". Con los numeros aparte puede escribir la frase en su
+    // idioma, y ademas usarlos para algo mas que leerlos.
+
+    [Fact]
+    public async Task EvaluateDemandAsync_AnyAlert_CarriesTheNumbersThatRaisedIt()
+    {
+        var alerta = Assert.Single(await _service.EvaluateDemandAsync(SiteId, 112));
+
+        Assert.Equal(SiteId, alerta.SiteId);
+        Assert.Equal(112, alerta.MeasuredKw);
+        Assert.Equal(120, alerta.ContractedKw);
+    }
+
+    [Fact]
+    public async Task EvaluateDemandAsync_AboveTheContractedPower_TheNumbersShowTheExcess()
+    {
+        var alerta = Assert.Single(await _service.EvaluateDemandAsync(SiteId, 135));
+
+        Assert.Equal(135, alerta.MeasuredKw);
+        Assert.Equal(120, alerta.ContractedKw);
+        // De los dos numeros sale el margen, que aqui es negativo.
+        Assert.Equal(-15, alerta.ContractedKw!.Value - alerta.MeasuredKw!.Value);
+    }
 }
+

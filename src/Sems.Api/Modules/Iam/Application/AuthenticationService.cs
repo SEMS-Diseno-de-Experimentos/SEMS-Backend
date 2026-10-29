@@ -24,6 +24,8 @@ public sealed class AuthenticationService
     private readonly IIamEventPublisher _events;
     private readonly bool _requireVerification;
     private readonly bool _seedDemoData;
+    private readonly IGoogleTokenVerifier? _google;
+    private readonly string _googleClientId;
 
     private readonly Sems.Api.Modules.Devices.Application.DeviceCommandService _devices;
     private readonly Sems.Api.Modules.Energy.Application.EnergyCommandService _energy;
@@ -37,8 +39,15 @@ public sealed class AuthenticationService
         Sems.Api.Modules.Devices.Application.DeviceCommandService devices,
         Sems.Api.Modules.Energy.Application.EnergyCommandService energy,
         Sems.Api.Modules.Organizations.Application.OrganizationCommandService organizations,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider, IGoogleTokenVerifier? google = null)
     {
+        _google = google;
+        // Es el identificador publico de la aplicacion en Google, el mismo que
+        // lleva el boton en el navegador. No es un secreto: lo que autentica
+        // es el token firmado, no este valor.
+        _googleClientId = configuration["Security:Google:ClientId"]
+                          ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID")
+                          ?? string.Empty;
         _users = users;
         _hashing = hashing;
         _tokens = tokens;
@@ -220,6 +229,70 @@ public sealed class AuthenticationService
         }
         
         await analytics.CreateRankingAsync(userId.ToString(), "monthly", DateTime.UtcNow.AddDays(-30), DateTime.UtcNow, rankings, ct);
+    }
+
+    /// <summary>
+    /// Entra con una cuenta de Google, creandola la primera vez.
+    /// </summary>
+    /// <remarks>
+    /// <para>Las cuatro comprobaciones de abajo son la puerta de seguridad, y
+    /// cada una cierra un agujero distinto: que la integracion este
+    /// configurada; que el token se emitiera <b>para esta aplicacion</b> y no
+    /// para otra cualquiera; que traiga correo; y que Google haya verificado
+    /// ese correo. Sin la del publico, cualquiera con un token valido de otra
+    /// aplicacion entraria aqui.</para>
+    ///
+    /// <para>Quien entra por Google no tiene contrasena. Se guarda el resumen
+    /// de un valor aleatorio para que la columna nunca quede vacia y para que
+    /// la cuenta no se pueda usar con el inicio de sesion normal: nadie conoce
+    /// el valor en claro, ni nosotros.</para>
+    /// </remarks>
+    public async Task<SessionResult> SignInWithGoogleAsync(string? idToken,
+        CancellationToken ct = default)
+    {
+        if (_google is null || string.IsNullOrWhiteSpace(_googleClientId))
+        {
+            throw AppException.Validation("Google sign-in is not configured");
+        }
+        if (string.IsNullOrWhiteSpace(idToken))
+        {
+            throw AppException.Validation("idToken is required");
+        }
+
+        var identidad = await _google.VerifyAsync(idToken, ct)
+                        ?? throw AppException.Unauthorized("Google token is not valid");
+
+        if (!string.Equals(identidad.Audience, _googleClientId, StringComparison.Ordinal))
+        {
+            throw AppException.Unauthorized("Google token was issued for another application");
+        }
+        if (!identidad.EmailVerified)
+        {
+            throw AppException.Unauthorized("Google has not verified that email address");
+        }
+
+        var email = new EmailAddress(identidad.Email);
+        var user = await _users.FindByEmailAsync(email.Value, ct);
+
+        if (user is null)
+        {
+            // Google ya comprobo el correo, asi que la cuenta nace activa: pedir
+            // una verificacion por correo seria pedirla dos veces.
+            user = await _users.SaveAsync(User.Register(email,
+                _hashing.Hash(Guid.NewGuid().ToString()), RoleName.STAFF,
+                requireVerification: false, identidad.Name), ct);
+            _events.PublishUserRegistered(user.UserId, user.EmailAddress, user.Role.ToString());
+        }
+        else if (user.IsPending)
+        {
+            // Entro por Google con un correo que ya se habia registrado a mano
+            // y estaba sin verificar. Google acaba de verificarlo.
+            user.Activate();
+            await _users.SaveAsync(user, ct);
+        }
+
+        _events.PublishUserLoggedIn(user.UserId, user.EmailAddress);
+        return await BuildSessionAsync(user, ct);
     }
 
     public async Task<SessionResult> LoginAsync(string? emailAddress, string? password,

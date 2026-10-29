@@ -99,6 +99,8 @@ builder.Services.AddScoped<Sems.Api.Modules.Devices.Domain.Services.ISiteDirecto
 // la que se valoriza el consumo medido.
 builder.Services.AddScoped<Sems.Api.Modules.Energy.Domain.Services.ISiteCatalog,
     Sems.Api.Modules.Energy.Infrastructure.OrganizationsSiteCatalog>();
+builder.Services.AddScoped<Sems.Api.Modules.Energy.Domain.Services.IMeterAllowance,
+    Sems.Api.Modules.Energy.Infrastructure.OrganizationsMeterAllowance>();
 // Y el de organizaciones pregunta por el cupo de locales del plan contratado.
 builder.Services.AddScoped<Sems.Api.Modules.Organizations.Domain.Services.IPlanAllowance,
     Sems.Api.Modules.Organizations.Infrastructure.SubscriptionsPlanAllowance>();
@@ -174,6 +176,11 @@ builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IIamEventPublisher, InProcessIamEventPublisher>();
 builder.Services.AddScoped<IIamAcl, IamAcl>();
 builder.Services.AddScoped<AuthTokenService>();
+// La verificacion del token de Google sale a internet, asi que su cliente se
+// registra con el pool de conexiones en vez de crear uno por peticion.
+builder.Services.AddHttpClient<Sems.Api.Modules.Iam.Domain.Services.IGoogleTokenVerifier,
+    Sems.Api.Modules.Iam.Infrastructure.GoogleTokenInfoVerifier>(
+    cliente => cliente.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<AccountRecoveryService>();
