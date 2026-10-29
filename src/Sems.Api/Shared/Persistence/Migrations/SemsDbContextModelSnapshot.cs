@@ -32,11 +32,17 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<double?>("ContractedKw")
+                        .HasColumnType("double precision");
+
                     b.Property<Guid?>("DeviceId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("InactivityRuleId")
                         .HasColumnType("uuid");
+
+                    b.Property<double?>("MeasuredKw")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("Message")
                         .HasColumnType("text");
@@ -47,6 +53,9 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<string>("Severity")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("SiteId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Status")
                         .IsRequired()

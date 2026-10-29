@@ -111,12 +111,27 @@ public static class AlertResources
         [property: JsonPropertyName("message")] string? Message,
         [property: JsonPropertyName("severity")] string? Severity,
         [property: JsonPropertyName("status")] string Status,
+        // Los numeros del aviso, aparte del texto. El titulo y el mensaje van
+        // en ingles y el cliente los pinta tal cual, asi que una interfaz en
+        // espanol acababa mostrando "Demand close to the contracted limit";
+        // con estos campos puede escribir la frase en su idioma. Solo vienen
+        // en las alertas de demanda.
+        [property: JsonPropertyName("site_id")] string? SiteId,
+        [property: JsonPropertyName("measured_kw")] double? MeasuredKw,
+        [property: JsonPropertyName("contracted_kw")] double? ContractedKw,
+        // Lo que falta para superar lo contratado; negativo si ya se supero.
+        [property: JsonPropertyName("headroom_kw")] double? HeadroomKw,
         [property: JsonPropertyName("triggered_at")] DateTime TriggeredAt,
         [property: JsonPropertyName("resolved_at")] DateTime? ResolvedAt)
     {
         public static AlertResponse From(Alert a) => new(a.AlertId.ToString(), a.UserId.ToString(),
             a.DeviceId?.ToString(), a.ThresholdId?.ToString(), a.InactivityRuleId?.ToString(),
-            a.AlertType, a.Title, a.Message, a.Severity, a.Status, a.TriggeredAt, a.ResolvedAt);
+            a.AlertType, a.Title, a.Message, a.Severity, a.Status, a.SiteId?.ToString(),
+            a.MeasuredKw, a.ContractedKw,
+            a.ContractedKw is null || a.MeasuredKw is null
+                ? null
+                : Math.Round(a.ContractedKw.Value - a.MeasuredKw.Value, 2),
+            a.TriggeredAt, a.ResolvedAt);
     }
 
     public sealed record ThresholdResponse(
