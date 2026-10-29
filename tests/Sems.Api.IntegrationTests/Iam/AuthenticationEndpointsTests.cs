@@ -200,4 +200,41 @@ public class AuthenticationEndpointsTests : IClassFixture<SemsApiFactory>
         Assert.Equal(user.UserId, body.GetProperty("userId").GetGuid());
         Assert.Equal(user.Email, body.Text("emailAddress"));
     }
+
+    // ------------------------------------------------- entrada con Google
+
+    [Fact]
+    public async Task Google_WithoutAClientIdConfigured_Returns400SayingSo()
+    {
+        // Las pruebas no configuran la integracion, asi que el endpoint tiene
+        // que decirlo en vez de fallar de cualquier manera. La alternativa
+        // —aceptar el token sin saber para que aplicacion se emitio— seria
+        // dejar entrar a cualquiera.
+        var response = await _factory.CreateClient().PostJsonAsync("/api/v1/auth/google",
+            new { idToken = "lo-que-sea" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("not configured", (await response.ReadJsonAsync()).Text("message"));
+    }
+
+    [Fact]
+    public async Task Google_WithoutAToken_Returns400()
+    {
+        var response = await _factory.CreateClient().PostJsonAsync("/api/v1/auth/google",
+            new { idToken = "" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Google_IsReachableWithoutSigningInFirst()
+    {
+        // Es una puerta de entrada: exigir sesion para entrar no tendria
+        // sentido. Lo que no puede devolver es 401 por falta de token.
+        var response = await _factory.CreateClient().PostJsonAsync("/api/v1/auth/google",
+            new { idToken = "lo-que-sea" });
+
+        Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }
+

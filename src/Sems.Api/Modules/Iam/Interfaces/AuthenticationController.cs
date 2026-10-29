@@ -45,6 +45,12 @@ public sealed class AuthenticationController : ControllerBase
     public async Task<LoginResponse> Login([FromBody] LoginRequest request) =>
         LoginResponse.From(await _authentication.LoginAsync(request.EmailAddress, request.Password));
 
+    /// <summary>Signs in with a Google account, creating it the first time.</summary>
+    [HttpPost("google")]
+    public async Task<LoginResponse> Google([FromBody] GoogleSignInRequest request,
+        CancellationToken ct) =>
+        LoginResponse.From(await _authentication.SignInWithGoogleAsync(request.IdToken, ct));
+
     /// <summary>Issues a new token pair and rotates the refresh token provided.</summary>
     [HttpPost("refresh")]
     public async Task<LoginResponse> Refresh([FromBody] RefreshRequest request) =>

@@ -27,6 +27,12 @@ public static class AuthResources
         [Required(ErrorMessage = "is required")] string EmailAddress,
         [Required(ErrorMessage = "is required")] string Password);
 
+    /// <summary>
+    /// Token de identidad que devuelve el boton de Google en el navegador.
+    /// </summary>
+    public sealed record GoogleSignInRequest(
+        [Required(ErrorMessage = "is required")] string IdToken);
+
     public sealed record RefreshRequest(
         [Required(ErrorMessage = "is required")] string RefreshToken);
 
