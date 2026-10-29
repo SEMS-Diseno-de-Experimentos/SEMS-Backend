@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Sems.Api.Modules.Alerts.Domain.Services;
+using Sems.Api.Modules.Analytics.Application;
 using Sems.Api.Modules.Subscriptions.Infrastructure;
 using Sems.Api.Shared.Persistence;
 
@@ -85,6 +86,20 @@ public class SemsApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(Emails);
+
+            // El recalculo de hallazgos corre en segundo plano unos segundos
+            // despues de la ultima lectura. En produccion eso es lo que se
+            // quiere; en una prueba es una carrera: si el trabajador llega
+            // primero, la llamada explicita al endpoint ya no encuentra nada
+            // que calcular por la idempotencia del dia, y la prueba pasa o
+            // falla segun lo rapida que sea la maquina. Aqui se quita, y lo
+            // que se prueba es el endpoint, que es el que responde.
+            foreach (var registro in services
+                         .Where(d => d.ImplementationType == typeof(InsightRecomputeWorker))
+                         .ToList())
+            {
+                services.Remove(registro);
+            }
         });
     }
 

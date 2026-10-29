@@ -44,21 +44,33 @@ public class InsightEndpointsTests : IClassFixture<SemsApiFactory>
     private static async Task DayAsync(Layout layout, int daysAgo, double kwh, double powerWatts,
         double peakKwh = 0)
     {
-        var dia = DateTime.UtcNow.Date.AddDays(-daysAgo);
-
-        // Las 10:00 de Peru son las 15:00 UTC: fuera de punta.
+        // Las 10:00 de Peru caen fuera de punta; las 19:00, dentro.
         await (await layout.User.Client.PostReadingAsync(layout.User.UserId, layout.MeterId, null,
-                powerWatts, energyKwh: kwh - peakKwh, timestamp: dia.AddHours(15)))
+                powerWatts, energyKwh: kwh - peakKwh, timestamp: EnPeru(daysAgo, 10)))
             .ExpectAsync(HttpStatusCode.Created);
 
         if (peakKwh > 0)
         {
-            // Las 19:00 de Peru son las 00:00 UTC del dia siguiente: punta.
             await (await layout.User.Client.PostReadingAsync(layout.User.UserId, layout.MeterId,
-                    null, powerWatts, energyKwh: peakKwh, timestamp: dia.AddDays(1)))
+                    null, powerWatts, energyKwh: peakKwh, timestamp: EnPeru(daysAgo, 19)))
                 .ExpectAsync(HttpStatusCode.Created);
         }
     }
+
+    /// <summary>
+    /// Peru esta en UTC-5, y el motor corta el dia natural ahi.
+    /// </summary>
+    /// <remarks>
+    /// Anclar la siembra al dia UTC hacia que la prueba fallara entre las 00:00
+    /// y las 05:00 UTC: en esa franja en Peru todavia es el dia anterior, de
+    /// modo que el "ultimo dia cerrado" que sembraba la prueba era hoy para el
+    /// motor, que solo mira dias completos, y lo descartaba.
+    /// </remarks>
+    private static readonly TimeSpan Peru = TimeSpan.FromHours(-5);
+
+    /// <summary>Instante UTC de una hora local de Peru, hace tantos dias.</summary>
+    private static DateTime EnPeru(int daysAgo, double hora) =>
+        (DateTime.UtcNow + Peru).Date.AddDays(-daysAgo).AddHours(hora) - Peru;
 
     private static Task<HttpResponseMessage> RecomputeAsync(Layout layout) =>
         layout.User.Client.PostJsonAsync("/api/v1/analytics/insights/recompute",
