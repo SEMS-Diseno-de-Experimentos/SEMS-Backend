@@ -98,6 +98,8 @@ public class OnboardingFlowTests : IClassFixture<SemsApiFactory>
     public async Task Onboarding_SubmeterInAZoneOfAnotherSite_IsRejectedAndNotListed()
     {
         var user = await _factory.CreateUserAsync();
+        // Dos locales: el plan de entrada incluye uno solo.
+        await user.Client.UseUnlimitedSitesPlanAsync(user.UserId);
         var organization = await user.Client.CreateOrganizationAsync(user.UserId);
         var organizationId = organization.Id("organization_id");
         var site = await user.Client.CreateSiteAsync(organizationId, "T-001");

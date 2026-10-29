@@ -9,6 +9,10 @@ public interface IUserRepository
     Task<User?> FindByIdAsync(Guid userId, CancellationToken ct = default);
     Task<User?> FindByEmailAsync(string emailAddress, CancellationToken ct = default);
     Task<bool> ExistsByEmailAsync(string emailAddress, CancellationToken ct = default);
+
+    /// <summary>Varios usuarios de una vez, para no consultar uno por fila.</summary>
+    Task<List<User>> FindByIdsAsync(IReadOnlyCollection<Guid> userIds,
+        CancellationToken ct = default);
 }
 
 public interface IRefreshTokenRepository

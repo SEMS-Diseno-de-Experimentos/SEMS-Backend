@@ -34,7 +34,8 @@ public sealed class AuthenticationController : ControllerBase
     [HttpPost("register")]
     public async Task<LoginResponse> Register([FromBody] RegisterRequest request)
     {
-        var result = await _authentication.RegisterAsync(request.EmailAddress, request.Password, request.Role);
+        var result = await _authentication.RegisterAsync(request.EmailAddress, request.Password,
+            request.Role, request.FullName, request.Segment);
         try { await _seeder.SeedForUserAsync(request.EmailAddress); } catch { /* ignore seeding errors */ }
         return LoginResponse.From(result);
     }

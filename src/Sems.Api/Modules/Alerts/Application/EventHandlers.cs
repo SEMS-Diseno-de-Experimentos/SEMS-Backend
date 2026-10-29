@@ -231,6 +231,47 @@ public sealed class ReadingProcessedHandler : IDomainEventHandler<DomainEvents.R
     }
 }
 
+/// <summary>
+/// Evalua la demanda del local cada vez que llega una lectura (US29 y US30).
+/// </summary>
+/// <remarks>
+/// <para>Antes la evaluacion solo ocurria si alguien llamaba al endpoint a
+/// mano, lo que vaciaba de sentido a la alerta: el pico que fija el cargo del
+/// mes dura minutos, y nadie esta pulsando un boton cuando pasa.</para>
+///
+/// <para>El freno para no inundar al cliente vive en la regla
+/// (<c>DemandRule.MereceAviso</c>), no aqui: es una decision de negocio, y asi
+/// vale igual para la evaluacion automatica y para la manual.</para>
+/// </remarks>
+public sealed class DemandReadingHandler : IDomainEventHandler<DomainEvents.ReadingProcessed>
+{
+    private readonly AlertCommandService _alertCommands;
+    private readonly ILogger<DemandReadingHandler> _logger;
+
+    public DemandReadingHandler(AlertCommandService alertCommands,
+        ILogger<DemandReadingHandler> logger)
+    {
+        _alertCommands = alertCommands;
+        _logger = logger;
+    }
+
+    public async Task HandleAsync(DomainEvents.ReadingProcessed e, CancellationToken ct = default)
+    {
+        if (e.SiteId is null || e.PowerKw is null or <= 0)
+        {
+            return;
+        }
+
+        var levantadas = await _alertCommands.EvaluateDemandAsync(e.SiteId.Value, e.PowerKw.Value, ct);
+        if (levantadas.Count > 0)
+        {
+            _logger.LogInformation(
+                "La lectura de {PowerKw} kW levanto {Count} alerta(s) de demanda en el local {SiteId}",
+                e.PowerKw, levantadas.Count, e.SiteId);
+        }
+    }
+}
+
 /// <summary>URL publica del frontend, usada en los enlaces de los correos.</summary>
 internal static class AppUrl
 {

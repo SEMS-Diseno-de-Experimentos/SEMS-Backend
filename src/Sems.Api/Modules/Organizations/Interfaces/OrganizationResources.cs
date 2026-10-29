@@ -79,9 +79,19 @@ public static class OrganizationResources
         [Required(ErrorMessage = "is required")] string ZoneType,
         [property: JsonPropertyName("operates_off_hours")] bool OperatesOffHours);
 
+    /// <summary>
+    /// Alta o cambio de acceso de una persona a la organizacion.
+    /// </summary>
+    /// <remarks>
+    /// Se puede identificar a la persona por su correo o por su identificador.
+    /// El correo es lo normal: quien administra una cadena conoce el correo de
+    /// sus companeros, no su UUID, y exigir el identificador dejaba la pantalla
+    /// de accesos inservible sin consultar la base de datos.
+    /// </remarks>
     public sealed record GrantMembershipRequest(
-        [property: JsonPropertyName("user_id")]
-        [Required(ErrorMessage = "is required")] string UserId,
+        [property: JsonPropertyName("user_id")] string? UserId,
+        [property: JsonPropertyName("email")]
+        [EmailAddress(ErrorMessage = "must be a valid email")] string? Email,
         [property: JsonPropertyName("role")]
         [Required(ErrorMessage = "is required")] string Role,
         [property: JsonPropertyName("site_id")] string? SiteId);
@@ -144,13 +154,18 @@ public static class OrganizationResources
         [property: JsonPropertyName("membership_id")] string MembershipId,
         [property: JsonPropertyName("organization_id")] string OrganizationId,
         [property: JsonPropertyName("user_id")] string UserId,
+        // El correo lo pone IAM al responder: sin el, la pantalla de accesos
+        // listaba UUIDs y no habia forma de saber a quien se le estaba
+        // quitando el acceso. Puede venir vacio si la cuenta se borro y el
+        // vinculo quedo huerfano.
+        [property: JsonPropertyName("email")] string? Email,
         [property: JsonPropertyName("role")] string Role,
         [property: JsonPropertyName("site_id")] string? SiteId,
         [property: JsonPropertyName("status")] string Status,
         [property: JsonPropertyName("created_at")] DateTime CreatedAt)
     {
-        public static MembershipResource From(Membership m) => new(
-            m.MembershipId.ToString(), m.OrganizationId.ToString(), m.UserId.ToString(),
+        public static MembershipResource From(Membership m, string? email = null) => new(
+            m.MembershipId.ToString(), m.OrganizationId.ToString(), m.UserId.ToString(), email,
             m.Role.ToString(), m.SiteId?.ToString(), m.Status.ToString(), m.CreatedAt);
     }
 

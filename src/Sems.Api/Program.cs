@@ -93,7 +93,16 @@ builder.Services.AddScoped<IDeviceBindingRepository, DeviceBindingRepository>();
 builder.Services.AddScoped<IDeviceConfigurationRepository, DeviceConfigurationRepository>();
 builder.Services.AddScoped<IDeviceEventRepository, DeviceEventRepository>();
 // El puerto que dispositivos usa para saber si un local y una zona existen.
-builder.Services.AddScoped<ISiteDirectory, OrganizationsSiteDirectory>();
+builder.Services.AddScoped<Sems.Api.Modules.Devices.Domain.Services.ISiteDirectory,
+    Sems.Api.Modules.Devices.Infrastructure.OrganizationsSiteDirectory>();
+// El de energia pregunta lo mismo y ademas por la tarifa del local, que es con
+// la que se valoriza el consumo medido.
+builder.Services.AddScoped<Sems.Api.Modules.Energy.Domain.Services.ISiteCatalog,
+    Sems.Api.Modules.Energy.Infrastructure.OrganizationsSiteCatalog>();
+// Y el de organizaciones pregunta por el cupo de locales del plan contratado.
+builder.Services.AddScoped<Sems.Api.Modules.Organizations.Domain.Services.IPlanAllowance,
+    Sems.Api.Modules.Organizations.Infrastructure.SubscriptionsPlanAllowance>();
+builder.Services.AddScoped<ConsumptionBreakdownService>();
 builder.Services.AddScoped<DeviceCommandService>();
 builder.Services.AddScoped<DeviceQueryService>();
 
@@ -113,6 +122,10 @@ builder.Services.AddScoped<IDeviceIdentificationRepository, DeviceIdentification
 builder.Services.AddScoped<IConsumptionRankingRepository, ConsumptionRankingRepository>();
 builder.Services.AddScoped<IBillCalculator, EnergyBillCalculator>();
 builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<IEnergyUsage, EnergyUsageReader>();
+builder.Services.AddScoped<InsightEngine>();
+builder.Services.AddSingleton<InsightRecomputeQueue>();
+builder.Services.AddHostedService<InsightRecomputeWorker>();
 
 builder.Services.AddScoped<IPlanRepository, PlanRepository>();
 builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
@@ -162,6 +175,7 @@ builder.Services.AddScoped<IIamEventPublisher, InProcessIamEventPublisher>();
 builder.Services.AddScoped<IIamAcl, IamAcl>();
 builder.Services.AddScoped<AuthTokenService>();
 builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<AccountRecoveryService>();
 
 // ------------------------------------------------- consumidores de eventos
@@ -173,6 +187,8 @@ builder.Services.AddScoped<IDomainEventHandler<DomainEvents.PasswordResetRequest
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.PaymentProcessed>, PaymentProcessedHandler>();
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.AlertTriggered>, AlertTriggeredHandler>();
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.ReadingProcessed>, ReadingProcessedHandler>();
+builder.Services.AddScoped<IDomainEventHandler<DomainEvents.ReadingProcessed>, DemandReadingHandler>();
+builder.Services.AddScoped<IDomainEventHandler<DomainEvents.ReadingProcessed>, InsightEventHandler>();
 
 // ---------------------------------------------------------------------- CORS
 // Tres origenes: las dos aplicaciones desplegadas y el entorno de desarrollo.

@@ -23,9 +23,9 @@ public sealed class EnergyMeterController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<MeterResponse>> Register([FromBody] RegisterMeterRequest request)
     {
-        var meter = await _commands.RegisterMeterAsync(request.UserId, request.MeterSerial,
-            request.Model, request.Brand, request.Location, request.FirmwareVersion,
-            request.MaxPowerWatts);
+        var meter = await _commands.RegisterMeterAsync(request.UserId, request.SiteId,
+            request.ZoneId, request.MeterSerial, request.Model, request.Brand, request.Location,
+            request.FirmwareVersion, request.MaxPowerWatts);
         return StatusCode(StatusCodes.Status201Created, MeterResponse.From(meter));
     }
 
@@ -33,6 +33,22 @@ public sealed class EnergyMeterController : ControllerBase
     [HttpGet("user/{userId}")]
     public async Task<List<MeterResponse>> ByUser(string userId) =>
         (await _queries.MetersByUserAsync(userId)).Select(MeterResponse.From).ToList();
+
+    /// <summary>Lists the meters installed in a site.</summary>
+    [HttpGet("site/{siteId:guid}")]
+    public async Task<List<MeterResponse>> BySite(Guid siteId) =>
+        (await _queries.MetersBySiteAsync(siteId)).Select(MeterResponse.From).ToList();
+
+    /// <summary>Lists the meters of a zone.</summary>
+    [HttpGet("zone/{zoneId:guid}")]
+    public async Task<List<MeterResponse>> ByZone(Guid zoneId) =>
+        (await _queries.MetersByZoneAsync(zoneId)).Select(MeterResponse.From).ToList();
+
+    /// <summary>Reassigns a meter to another zone of the same site.</summary>
+    [HttpPatch("{meterId:guid}/zone")]
+    public async Task<MeterResponse> ReassignZone(Guid meterId,
+        [FromBody] ReassignMeterZoneRequest request) =>
+        MeterResponse.From(await _commands.ReassignMeterZoneAsync(meterId, request.ZoneId));
 
     /// <summary>Deactivates a meter.</summary>
     [HttpPatch("{meterId:guid}/deactivate")]

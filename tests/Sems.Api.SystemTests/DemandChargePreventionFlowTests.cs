@@ -38,24 +38,38 @@ public class DemandChargePreventionFlowTests : IClassFixture<SemsApiFactory>
             .ExpectAsync(HttpStatusCode.Created);
         Assert.Equal(102m, rule.Number("warning_threshold_kw"));
 
-        var meter = await (await client.PostMeterAsync(manager.UserId, $"EOS-{Guid.NewGuid():N}"))
-            .ExpectAsync(HttpStatusCode.Created);
+        var meter = await (await client.PostMeterAsync(manager.UserId, $"EOS-{Guid.NewGuid():N}",
+            siteId)).ExpectAsync(HttpStatusCode.Created);
         var device = await client.CreateDeviceAsync(manager.UserId, siteId, null,
             $"SM-MAIN-{Guid.NewGuid():N}");
 
         return new MeteredSite(manager, siteId, meter.Text("id"), device.Text("deviceId"));
     }
 
-    /// <summary>Registra la lectura y evalua su demanda contra las reglas del local.</summary>
+    /// <summary>
+    /// Registra la lectura. La demanda la evalua el propio sistema.
+    /// </summary>
+    /// <remarks>
+    /// Ya no hace falta llamar a la evaluacion: la lectura la dispara. Es lo que
+    /// pide US29, porque el pico que fija el cargo del mes dura minutos y nadie
+    /// esta pulsando un boton cuando pasa.
+    /// </remarks>
+    private static async Task ReadAsync(MeteredSite metered, double demandKw, int minute) =>
+        await (await metered.Manager.Client.PostReadingAsync(metered.Manager.UserId,
+                metered.MeterId, metered.DeviceId, demandKw * 1000,
+                timestamp: FirstReading.AddMinutes(minute)))
+            .ExpectAsync(HttpStatusCode.Created);
+
+    /// <summary>Evalua la demanda a mano, como hace la pantalla del local.</summary>
+    private static async Task<JsonElement> EvaluateAsync(MeteredSite metered, double demandKw) =>
+        await (await metered.Manager.Client.PostDemandEvaluationAsync(metered.SiteId, demandKw))
+            .ExpectAsync(HttpStatusCode.OK);
+
     private static async Task<JsonElement> ReadAndEvaluateAsync(MeteredSite metered, double demandKw,
         int minute)
     {
-        await (await metered.Manager.Client.PostReadingAsync(metered.Manager.UserId, metered.MeterId,
-                metered.DeviceId, demandKw * 1000, timestamp: FirstReading.AddMinutes(minute)))
-            .ExpectAsync(HttpStatusCode.Created);
-
-        return await (await metered.Manager.Client.PostDemandEvaluationAsync(metered.SiteId, demandKw))
-            .ExpectAsync(HttpStatusCode.OK);
+        await ReadAsync(metered, demandKw, minute);
+        return await EvaluateAsync(metered, demandKw);
     }
 
     private static string ResultOf(JsonElement alerts) =>
@@ -83,14 +97,18 @@ public class DemandChargePreventionFlowTests : IClassFixture<SemsApiFactory>
         var metered = await MeteredSiteAsync();
         var client = metered.Manager.Client;
 
-        // US29, US30, US31 y TS05: cada lectura se registra y su demanda se evalua.
-        var results = new List<string>();
+        // US29, US30, US31 y TS05: basta registrar las lecturas; el sistema
+        // evalua la demanda de cada una contra la regla del local.
         var demands = new[] { 90d, 104d, 118d, 132d };
         for (var i = 0; i < demands.Length; i++)
         {
-            results.Add(ResultOf(await ReadAndEvaluateAsync(metered, demands[i], i)));
+            await ReadAsync(metered, demands[i], i);
         }
-        Assert.Equal(new[] { "none", "WARNING", "WARNING", "CRITICAL" }, results);
+
+        // Evaluar a mano justo despues no duplica el aviso: la regla se calla
+        // media hora tras avisar del mismo nivel. Sin ese freno, un medidor que
+        // reporta cada minuto generaria una alerta por lectura.
+        Assert.Equal("none", ResultOf(await EvaluateAsync(metered, 132d)));
 
         // US24: la ultima lectura es el consumo actual.
         var current = await (await client.GetAsync(
@@ -98,13 +116,15 @@ public class DemandChargePreventionFlowTests : IClassFixture<SemsApiFactory>
             .ExpectAsync(HttpStatusCode.OK);
         Assert.Equal(132_000d, current.GetProperty("power_watts").GetDouble());
 
-        // Tres alertas listadas para el responsable y tres correos enviados.
+        // Dos alertas, no cuatro: la de 104 kW avisa, la de 118 kW se calla por
+        // ser el mismo nivel, y la de 132 kW vuelve a avisar porque empeorar
+        // siempre es noticia nueva.
         var alerts = await (await client.GetAsync($"/api/v1/users/{metered.Manager.UserId}/alerts"))
             .ExpectAsync(HttpStatusCode.OK);
-        Assert.Equal(new[] { "CRITICAL", "WARNING", "WARNING" },
+        Assert.Equal(new[] { "CRITICAL", "WARNING" },
             alerts.EnumerateArray().Select(a => a.Text("severity")).OrderBy(s => s));
         var emails = _factory.Emails.SentTo(metered.Manager.Email, AlertSubject);
-        Assert.Equal(3, emails.Count);
+        Assert.Equal(2, emails.Count);
         Assert.Contains(emails, e => e.Body.Contains("12 kW above the 120 kW contracted"));
 
         // US35 y US36: la factura con demanda maxima de 132 kW cobra 12 kW de exceso.

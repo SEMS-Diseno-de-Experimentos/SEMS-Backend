@@ -140,6 +140,12 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("LastAlertAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("LastAlertLevel")
+                        .HasColumnType("integer");
+
                     b.Property<string>("RuleName")
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
@@ -856,6 +862,9 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -869,12 +878,19 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<Guid?>("ZoneId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MeterSerial")
                         .IsUnique();
 
+                    b.HasIndex("SiteId");
+
                     b.HasIndex("UserId");
+
+                    b.HasIndex("ZoneId");
 
                     b.ToTable("em_energy_meters", (string)null);
                 });
@@ -1013,6 +1029,10 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("FullName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1020,6 +1040,10 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.Property<string>("Role")
                         .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Segment")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 

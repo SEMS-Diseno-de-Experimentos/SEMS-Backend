@@ -24,6 +24,12 @@ public static class EnergyResources
     public sealed record RegisterMeterRequest(
         [property: JsonPropertyName("user_id")]
         [Required(ErrorMessage = "is required")] string UserId,
+        // El local es obligatorio: la tarifa, la potencia contratada y el
+        // recibo son del suministro, no de quien da de alta el aparato.
+        [property: JsonPropertyName("site_id")]
+        [Required(ErrorMessage = "is required")] Guid SiteId,
+        // La zona no: al abrir un local puede que aun no esten definidas.
+        [property: JsonPropertyName("zone_id")] Guid? ZoneId,
         [property: JsonPropertyName("meter_serial")]
         [Required(ErrorMessage = "is required")] string MeterSerial,
         [property: JsonPropertyName("model")] string? Model,
@@ -52,9 +58,14 @@ public static class EnergyResources
 
     // -------------------------------------------------------------- respuestas
 
+    public sealed record ReassignMeterZoneRequest(
+        [property: JsonPropertyName("zone_id")] Guid? ZoneId);
+
     public sealed record MeterResponse(
         [property: JsonPropertyName("id")] string Id,
         [property: JsonPropertyName("user_id")] string UserId,
+        [property: JsonPropertyName("site_id")] string SiteId,
+        [property: JsonPropertyName("zone_id")] string? ZoneId,
         [property: JsonPropertyName("meter_serial")] string MeterSerial,
         [property: JsonPropertyName("model")] string? Model,
         [property: JsonPropertyName("brand")] string? Brand,
@@ -67,7 +78,8 @@ public static class EnergyResources
         [property: JsonPropertyName("updated_at")] DateTime UpdatedAt)
     {
         public static MeterResponse From(EnergyMeter m) => new(
-            m.Id.ToString(), m.UserId, m.MeterSerial, m.Model, m.Brand, m.Location, m.Status,
+            m.Id.ToString(), m.UserId, m.SiteId.ToString(), m.ZoneId?.ToString(), m.MeterSerial,
+            m.Model, m.Brand, m.Location, m.Status,
             m.FirmwareVersion, m.MaxPowerWatts, m.RegisteredAt, m.LastSeenAt, m.UpdatedAt);
     }
 
@@ -155,7 +167,14 @@ public static class EnergyResources
         [property: JsonPropertyName("excess_power_per_kw_month")] decimal ExcessPowerPerKwMonth,
         [property: JsonPropertyName("fixed_charge")] decimal FixedCharge,
         [property: JsonPropertyName("igv")] decimal Igv,
+        // Solo la franja, sin texto alrededor. Antes venia como
+        // "18:00-23:00 every day": una frase en ingles dentro de un campo de
+        // datos, que el cliente pintaba tal cual y remataba con su propio
+        // "todos los dias", de modo que la pantalla decia las dos cosas, en dos
+        // idiomas. La frecuencia va aparte, como bandera, y cada cliente la
+        // redacta en su idioma.
         [property: JsonPropertyName("peak_hours")] string PeakHours,
+        [property: JsonPropertyName("peak_every_day")] bool PeakEveryDay,
         [property: JsonPropertyName("in_peak_now")] bool InPeakNow,
         [property: JsonPropertyName("timestamp")] DateTime Timestamp)
     {
@@ -163,9 +182,11 @@ public static class EnergyResources
             t.Provider, t.TariffCategory, t.Currency, t.EnergiaPuntaPorKwh,
             t.EnergiaFueraDePuntaPorKwh, t.PotenciaPorKwMes, t.ExcesoDePotenciaPorKwMes,
             t.CargoFijoMensual, t.Igv,
-            // Todos los dias: el pliego solo excluye los domingos a solicitud del
-            // cliente, y esa exclusion es de cada suministro, no de la tarifa.
-            $"{HorarioPunta.HoraInicio:00}:00-{HorarioPunta.HoraFin:00}:00 every day",
+            $"{HorarioPunta.HoraInicio:00}:00-{HorarioPunta.HoraFin:00}:00",
+            // Todos los dias: el pliego solo excluye los domingos a solicitud
+            // del cliente, y esa exclusion es de cada suministro, no de la
+            // tarifa, asi que la tarifa por si sola no excluye ninguno.
+            true,
             HorarioPunta.EsHoraPunta(DateTime.UtcNow), t.Timestamp);
     }
 

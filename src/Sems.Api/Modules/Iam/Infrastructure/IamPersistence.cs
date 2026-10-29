@@ -17,6 +17,10 @@ public sealed class UserConfig : IEntityTypeConfiguration<User>
         b.Property(u => u.PasswordHash).HasMaxLength(200).IsRequired();
         b.Property(u => u.Role).HasConversion<string>().HasMaxLength(20);
         b.Property(u => u.Status).HasMaxLength(20);
+        b.Property(u => u.FullName).HasMaxLength(120);
+        // Igual que el rol: el segmento se guarda por su nombre y no por su
+        // posicion, para que reordenar el enum no reinterprete las filas.
+        b.Property(u => u.Segment).HasConversion<string>().HasMaxLength(20);
         b.HasIndex(u => u.EmailAddress).IsUnique();
     }
 }
@@ -81,6 +85,12 @@ public sealed class UserRepository : IUserRepository
 
     public Task<bool> ExistsByEmailAsync(string emailAddress, CancellationToken ct = default) =>
         _db.Set<User>().AnyAsync(u => u.EmailAddress == emailAddress, ct);
+
+    public Task<List<User>> FindByIdsAsync(IReadOnlyCollection<Guid> userIds,
+        CancellationToken ct = default) =>
+        userIds.Count == 0
+            ? Task.FromResult(new List<User>())
+            : _db.Set<User>().Where(u => userIds.Contains(u.UserId)).ToListAsync(ct);
 }
 
 public sealed class RefreshTokenRepository : IRefreshTokenRepository
@@ -138,4 +148,28 @@ public sealed class IamAcl : IIamAcl
 
     public async Task<string?> EmailOfAsync(Guid userId, CancellationToken ct = default) =>
         (await _users.FindByIdAsync(userId, ct))?.EmailAddress;
+
+    public async Task<Guid?> UserIdOfAsync(string? emailAddress, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(emailAddress))
+        {
+            return null;
+        }
+        // Se normaliza igual que al registrarse: el correo se guarda en
+        // minusculas, y buscarlo tal como lo escribio quien invita no daria con
+        // nadie si cambio una mayuscula.
+        var normalizado = emailAddress.Trim().ToLowerInvariant();
+        return (await _users.FindByEmailAsync(normalizado, ct))?.UserId;
+    }
+
+    public async Task<Dictionary<Guid, string>> EmailsOfAsync(IReadOnlyCollection<Guid> userIds,
+        CancellationToken ct = default)
+    {
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, string>();
+        }
+        return (await _users.FindByIdsAsync(userIds, ct))
+            .ToDictionary(u => u.UserId, u => u.EmailAddress);
+    }
 }

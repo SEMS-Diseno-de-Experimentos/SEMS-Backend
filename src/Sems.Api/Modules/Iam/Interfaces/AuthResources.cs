@@ -16,7 +16,12 @@ public static class AuthResources
         [EmailAddress(ErrorMessage = "must be a valid email")] string EmailAddress,
         [Required(ErrorMessage = "is required")]
         [MinLength(8, ErrorMessage = "must be at least 8 characters")] string Password,
-        string? Role);
+        string? Role,
+        // El nombre y el segmento son opcionales: el alta funciona sin ellos.
+        // Antes el cliente los pedia en el formulario y los guardaba solo en el
+        // navegador, de modo que se perdian al entrar desde otro equipo.
+        [MaxLength(120, ErrorMessage = "must be at most 120 characters")] string? FullName,
+        string? Segment);
 
     public sealed record LoginRequest(
         [Required(ErrorMessage = "is required")] string EmailAddress,
@@ -49,11 +54,15 @@ public static class AuthResources
     /// nuevo. Separar ambos limita el danio si el de acceso se filtra.</para>
     /// </summary>
     public sealed record LoginResponse(string Token, string RefreshToken, Guid UserId,
-        string EmailAddress, List<string> Roles)
+        string EmailAddress, List<string> Roles, string? FullName, string? Segment)
     {
         public static LoginResponse From(SessionResult s) =>
-            new(s.Token, s.RefreshToken, s.UserId, s.EmailAddress, s.Roles);
+            new(s.Token, s.RefreshToken, s.UserId, s.EmailAddress, s.Roles, s.FullName, s.Segment);
     }
+
+    public sealed record UpdateProfileRequest(
+        [MaxLength(120, ErrorMessage = "must be at most 120 characters")] string? FullName,
+        string? Segment);
 
     public sealed record MessageResponse(string Message);
 }

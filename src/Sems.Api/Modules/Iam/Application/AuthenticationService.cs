@@ -7,7 +7,7 @@ namespace Sems.Api.Modules.Iam.Application;
 
 /// <summary>Sesion entregada tras autenticarse.</summary>
 public sealed record SessionResult(string Token, string RefreshToken, Guid UserId,
-    string EmailAddress, List<string> Roles);
+    string EmailAddress, List<string> Roles, string? FullName, string? Segment);
 
 /// <summary>
 /// Alta e inicio de sesion.
@@ -56,7 +56,8 @@ public sealed class AuthenticationService
     }
 
     public async Task<SessionResult> RegisterAsync(string? emailAddress, string? password,
-        string? role, CancellationToken ct = default)
+        string? role, string? fullName = null, string? segment = null,
+        CancellationToken ct = default)
     {
         var email = new EmailAddress(emailAddress);
 
@@ -70,7 +71,8 @@ public sealed class AuthenticationService
         }
 
         var user = await _users.SaveAsync(User.Register(email, _hashing.Hash(password),
-            RoleNameExtensions.ToRoleName(role), _requireVerification), ct);
+            RoleNameExtensions.ToRoleName(role), _requireVerification, fullName,
+            UserSegmentExtensions.ToUserSegment(segment)), ct);
 
         _events.PublishUserRegistered(user.UserId, user.EmailAddress, user.Role.ToString());
 
@@ -114,6 +116,8 @@ public sealed class AuthenticationService
         // 2. Create a default Energy Meter
         var meter = await _energy.RegisterMeterAsync(
             userId.ToString(),
+            site.SiteId,
+            null,
             $"METER-{random.Next(10000, 99999)}",
             "SmartMeter V1",
             "EOS",
@@ -252,7 +256,7 @@ public sealed class AuthenticationService
         var refreshToken = await _authTokens.IssueRefreshTokenAsync(user.UserId, ct);
 
         return new SessionResult(accessToken, refreshToken, user.UserId, user.EmailAddress,
-            new List<string> { user.Role.ToString() });
+            new List<string> { user.Role.ToString() }, user.FullName, user.Segment?.ToString());
     }
 }
 

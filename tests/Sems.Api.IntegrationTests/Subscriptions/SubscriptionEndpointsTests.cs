@@ -42,6 +42,31 @@ public class SubscriptionEndpointsTests : IClassFixture<SemsApiFactory>
     }
 
     [Fact]
+    public async Task GetPlans_EachPlanDescribesItself_WithoutNamingAPlanThatDoesNotExist()
+    {
+        // El plan Pro decia "Todo lo de Básica" y Enterprise "Todo lo de
+        // Premium": un plan que el catalogo no vende. Quien compara planes para
+        // decidir no puede saber que incluye un nombre inventado.
+        var user = await _factory.CreateUserAsync();
+
+        var plans = await (await user.Client.GetAsync("/api/v1/subscription-plans"))
+            .ExpectAsync(HttpStatusCode.OK);
+
+        var nombres = plans.EnumerateArray().Select(p => p.Text("Name")).ToList();
+        var textos = plans.EnumerateArray()
+            .SelectMany(p => p.GetProperty("PlanFeatures").EnumerateArray())
+            .Select(f => f.Text("FeatureName"))
+            .ToList();
+
+        Assert.DoesNotContain(textos, t => t.Contains("Premium", StringComparison.OrdinalIgnoreCase));
+        // Lo que un plan diga que incluye tiene que ser un plan del catalogo.
+        foreach (var texto in textos.Where(t => t.StartsWith("Todo lo del plan ")))
+        {
+            Assert.Contains(texto["Todo lo del plan ".Length..], nombres);
+        }
+    }
+
+    [Fact]
     public async Task Create_SnakeCaseRequest_Returns201WithPascalCaseResponse()
     {
         var user = await _factory.CreateUserAsync();

@@ -143,7 +143,8 @@ public class EnergyContractTests
 
         var response = EnergyResources.TariffResponse.From(tariff);
 
-        Assert.Equal("18:00-23:00 every day", response.PeakHours);
+        Assert.Equal("18:00-23:00", response.PeakHours);
+        Assert.True(response.PeakEveryDay);
         Assert.Contains("\"peak_hours\"", JsonSerializer.Serialize(response));
     }
 }
