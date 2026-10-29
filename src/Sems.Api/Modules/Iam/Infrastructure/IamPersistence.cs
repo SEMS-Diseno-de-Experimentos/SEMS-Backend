@@ -34,6 +34,13 @@ public sealed class RefreshTokenConfig : IEntityTypeConfiguration<RefreshToken>
         b.Property(t => t.TokenHash).HasMaxLength(128).IsRequired();
         b.HasIndex(t => t.UserId);
         b.HasIndex(t => t.TokenHash).IsUnique();
+
+        // Al dar de baja una cuenta sus tokens tienen que desaparecer con ella:
+        // un token huerfano seguiria siendo una credencial valida.
+        b.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -47,6 +54,12 @@ public sealed class UserAuthTokenConfig : IEntityTypeConfiguration<UserAuthToken
         b.Property(t => t.Purpose).HasMaxLength(40).IsRequired();
         b.HasIndex(t => t.UserId);
         b.HasIndex(t => t.TokenHash).IsUnique();
+
+        // Mismo motivo que en los tokens de refresco.
+        b.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(t => t.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 

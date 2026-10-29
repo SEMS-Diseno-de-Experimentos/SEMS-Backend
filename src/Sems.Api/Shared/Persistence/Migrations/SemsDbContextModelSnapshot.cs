@@ -70,6 +70,10 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.HasIndex("DeviceId");
 
+                    b.HasIndex("InactivityRuleId");
+
+                    b.HasIndex("ThresholdId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("al_alerts", (string)null);
@@ -1131,6 +1135,8 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.HasIndex("OrganizationId");
 
+                    b.HasIndex("SiteId");
+
                     b.HasIndex("UserId");
 
                     b.HasIndex("OrganizationId", "UserId")
@@ -1361,6 +1367,8 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.HasKey("PaymentId");
 
+                    b.HasIndex("PaymentMethodId");
+
                     b.HasIndex("StripePaymentIntentId");
 
                     b.HasIndex("SubscriptionId");
@@ -1518,6 +1526,8 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.HasKey("SubscriptionId");
 
+                    b.HasIndex("PlanId");
+
                     b.HasIndex("StripeSubscriptionId");
 
                     b.HasIndex("UserId");
@@ -1566,12 +1576,136 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.ToTable("sb_subscription_plans", (string)null);
                 });
 
+            modelBuilder.Entity("Sems.Api.Modules.Alerts.Domain.Model.Alert", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Alerts.Domain.Model.InactivityRule", null)
+                        .WithMany()
+                        .HasForeignKey("InactivityRuleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Sems.Api.Modules.Alerts.Domain.Model.AlertThreshold", null)
+                        .WithMany()
+                        .HasForeignKey("ThresholdId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Alerts.Domain.Model.NotificationLog", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Alerts.Domain.Model.Alert", null)
+                        .WithMany()
+                        .HasForeignKey("AlertId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Devices.Domain.Model.DeviceBinding", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Devices.Domain.Model.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Devices.Domain.Model.DeviceConfiguration", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Devices.Domain.Model.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Devices.Domain.Model.DeviceEvent", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Devices.Domain.Model.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Iam.Domain.Model.RefreshToken", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Iam.Domain.Model.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Iam.Domain.Model.UserAuthToken", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Iam.Domain.Model.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Organizations.Domain.Model.Membership", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Organizations.Domain.Model.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sems.Api.Modules.Organizations.Domain.Model.Site", null)
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Organizations.Domain.Model.Site", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Organizations.Domain.Model.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Organizations.Domain.Model.Zone", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Organizations.Domain.Model.Site", null)
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Payments.Domain.Model.Invoice", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Payments.Domain.Model.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Payments.Domain.Model.Payment", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Payments.Domain.Model.PaymentMethodEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentMethodId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("Sems.Api.Modules.Subscriptions.Domain.Model.PlanFeature", b =>
                 {
                     b.HasOne("Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionPlan", null)
                         .WithMany("PlanFeatures")
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Subscriptions.Domain.Model.Subscription", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionPlan", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
