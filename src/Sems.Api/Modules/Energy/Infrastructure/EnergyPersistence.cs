@@ -21,6 +21,10 @@ public sealed class EnergyMeterConfig : IEntityTypeConfiguration<EnergyMeter>
         builder.Property(m => m.FirmwareVersion).HasMaxLength(40);
         builder.HasIndex(m => m.UserId);
         builder.HasIndex(m => m.MeterSerial).IsUnique();
+        // Los listados por local y por zona son la consulta habitual del
+        // supervisor, y el reparto de consumo los recorre entero.
+        builder.HasIndex(m => m.SiteId);
+        builder.HasIndex(m => m.ZoneId);
     }
 }
 
@@ -116,6 +120,14 @@ public sealed class EnergyMeterRepository : IEnergyMeterRepository
     public Task<List<EnergyMeter>> FindByUserIdAsync(string userId, CancellationToken ct = default) =>
         _db.Set<EnergyMeter>().Where(m => m.UserId == userId)
             .OrderByDescending(m => m.RegisteredAt).ToListAsync(ct);
+
+    public Task<List<EnergyMeter>> FindBySiteIdAsync(Guid siteId, CancellationToken ct = default) =>
+        _db.Set<EnergyMeter>().Where(m => m.SiteId == siteId)
+            .OrderByDescending(m => m.RegisteredAt).ToListAsync(ct);
+
+    public Task<List<EnergyMeter>> FindByZoneIdAsync(Guid zoneId, CancellationToken ct = default) =>
+        _db.Set<EnergyMeter>().Where(m => m.ZoneId == zoneId)
+            .OrderByDescending(m => m.RegisteredAt).ToListAsync(ct);
 }
 
 public sealed class EnergyReadingRepository : IEnergyReadingRepository
@@ -133,6 +145,21 @@ public sealed class EnergyReadingRepository : IEnergyReadingRepository
 
     public Task<EnergyReading?> FindByIdAsync(Guid id, CancellationToken ct = default) =>
         _db.Set<EnergyReading>().FirstOrDefaultAsync(r => r.Id == id, ct);
+
+    public Task<List<EnergyReading>> FindByMetersAsync(IReadOnlyCollection<string> meterIds,
+        DateTime from, CancellationToken ct = default)
+    {
+        if (meterIds.Count == 0)
+        {
+            // Sin medidores no hay nada que buscar, y un IN vacio es una
+            // consulta que algunos motores rechazan.
+            return Task.FromResult(new List<EnergyReading>());
+        }
+        return _db.Set<EnergyReading>()
+            .Where(r => meterIds.Contains(r.MeterId) && r.Timestamp >= from)
+            .OrderBy(r => r.Timestamp)
+            .ToListAsync(ct);
+    }
 
     public Task<List<EnergyReading>> FindByUserIdAsync(string userId, int limit,
         CancellationToken ct = default) =>

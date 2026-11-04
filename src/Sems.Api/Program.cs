@@ -93,7 +93,18 @@ builder.Services.AddScoped<IDeviceBindingRepository, DeviceBindingRepository>();
 builder.Services.AddScoped<IDeviceConfigurationRepository, DeviceConfigurationRepository>();
 builder.Services.AddScoped<IDeviceEventRepository, DeviceEventRepository>();
 // El puerto que dispositivos usa para saber si un local y una zona existen.
-builder.Services.AddScoped<ISiteDirectory, OrganizationsSiteDirectory>();
+builder.Services.AddScoped<Sems.Api.Modules.Devices.Domain.Services.ISiteDirectory,
+    Sems.Api.Modules.Devices.Infrastructure.OrganizationsSiteDirectory>();
+// El de energia pregunta lo mismo y ademas por la tarifa del local, que es con
+// la que se valoriza el consumo medido.
+builder.Services.AddScoped<Sems.Api.Modules.Energy.Domain.Services.ISiteCatalog,
+    Sems.Api.Modules.Energy.Infrastructure.OrganizationsSiteCatalog>();
+builder.Services.AddScoped<Sems.Api.Modules.Energy.Domain.Services.IMeterAllowance,
+    Sems.Api.Modules.Energy.Infrastructure.OrganizationsMeterAllowance>();
+// Y el de organizaciones pregunta por el cupo de locales del plan contratado.
+builder.Services.AddScoped<Sems.Api.Modules.Organizations.Domain.Services.IPlanAllowance,
+    Sems.Api.Modules.Organizations.Infrastructure.SubscriptionsPlanAllowance>();
+builder.Services.AddScoped<ConsumptionBreakdownService>();
 builder.Services.AddScoped<DeviceCommandService>();
 builder.Services.AddScoped<DeviceQueryService>();
 
@@ -113,6 +124,10 @@ builder.Services.AddScoped<IDeviceIdentificationRepository, DeviceIdentification
 builder.Services.AddScoped<IConsumptionRankingRepository, ConsumptionRankingRepository>();
 builder.Services.AddScoped<IBillCalculator, EnergyBillCalculator>();
 builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<IEnergyUsage, EnergyUsageReader>();
+builder.Services.AddScoped<InsightEngine>();
+builder.Services.AddSingleton<InsightRecomputeQueue>();
+builder.Services.AddHostedService<InsightRecomputeWorker>();
 
 builder.Services.AddScoped<IPlanRepository, PlanRepository>();
 builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
@@ -161,7 +176,13 @@ builder.Services.AddSingleton<ITokenService, JwtTokenService>();
 builder.Services.AddScoped<IIamEventPublisher, InProcessIamEventPublisher>();
 builder.Services.AddScoped<IIamAcl, IamAcl>();
 builder.Services.AddScoped<AuthTokenService>();
+// La verificacion del token de Google sale a internet, asi que su cliente se
+// registra con el pool de conexiones en vez de crear uno por peticion.
+builder.Services.AddHttpClient<Sems.Api.Modules.Iam.Domain.Services.IGoogleTokenVerifier,
+    Sems.Api.Modules.Iam.Infrastructure.GoogleTokenInfoVerifier>(
+    cliente => cliente.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<AccountRecoveryService>();
 
 // ------------------------------------------------- consumidores de eventos
@@ -173,6 +194,8 @@ builder.Services.AddScoped<IDomainEventHandler<DomainEvents.PasswordResetRequest
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.PaymentProcessed>, PaymentProcessedHandler>();
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.AlertTriggered>, AlertTriggeredHandler>();
 builder.Services.AddScoped<IDomainEventHandler<DomainEvents.ReadingProcessed>, ReadingProcessedHandler>();
+builder.Services.AddScoped<IDomainEventHandler<DomainEvents.ReadingProcessed>, DemandReadingHandler>();
+builder.Services.AddScoped<IDomainEventHandler<DomainEvents.ReadingProcessed>, InsightEventHandler>();
 
 // ---------------------------------------------------------------------- CORS
 // Tres origenes: las dos aplicaciones desplegadas y el entorno de desarrollo.
@@ -183,8 +206,10 @@ var allowedOrigins = (builder.Configuration["AllowedOrigins"]
                       ?? "https://sems-web-application.vercel.app,https://sems-diseno-web.vercel.app,http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+// Solo los origenes de la lista. Aceptar cualquiera junto con AllowCredentials
+// permitiria que cualquier pagina llamara a la API con la sesion del usuario.
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
-    .SetIsOriginAllowed(_ => true)
+    .WithOrigins(allowedOrigins)
     .AllowAnyHeader()
     .AllowAnyMethod()
     .AllowCredentials()));
@@ -419,3 +444,15 @@ else
 }
 
 app.Run();
+
+/// <summary>
+/// Punto de entrada de la aplicacion.
+/// </summary>
+/// <remarks>
+/// La clase que generan las instrucciones de nivel superior es interna. Se
+/// declara publica para que las pruebas puedan levantar la API completa con
+/// <c>WebApplicationFactory&lt;Program&gt;</c>.
+/// </remarks>
+public partial class Program
+{
+}

@@ -59,6 +59,42 @@ public static class EnergyEnums
 }
 
 /// <summary>
+/// Categorias tarifarias del pliego que reconoce la tarifa comercial.
+/// </summary>
+/// <remarks>
+/// <para>Se validan aqui, antes de pedir la tarifa al proveedor. El adaptador
+/// trata como baja tension cualquier categoria que no empiece por "MT", asi
+/// que sin esta comprobacion una categoria inexistente se facturaba como si
+/// fuera valida.</para>
+///
+/// <para>Es una lista propia y no el enum del modulo de organizaciones a
+/// proposito: energia no depende de ese bounded context.</para>
+/// </remarks>
+public static class TariffCategories
+{
+    public static readonly IReadOnlyList<string> All = new[] { "BT5B", "BT3", "BT4", "MT2", "MT3" };
+
+    public static bool IsKnown(string? value) =>
+        All.Contains(value?.Trim().ToUpperInvariant() ?? string.Empty);
+
+    /// <summary>La categoria en mayusculas, o <c>VALIDATION_ERROR</c> si no existe.</summary>
+    public static string Normalize(string? value)
+    {
+        var categoria = value?.Trim().ToUpperInvariant() ?? string.Empty;
+        if (categoria.Length == 0)
+        {
+            throw AppException.Validation("tariff_category is required");
+        }
+        if (!All.Contains(categoria))
+        {
+            throw AppException.Validation(
+                $"tariff_category must be one of {string.Join(", ", All)}");
+        }
+        return categoria;
+    }
+}
+
+/// <summary>
 /// Medicion electrica instantanea. Value object inmutable.
 ///
 /// <para>Las validaciones son las mismas que hacia <c>__post_init__</c> en

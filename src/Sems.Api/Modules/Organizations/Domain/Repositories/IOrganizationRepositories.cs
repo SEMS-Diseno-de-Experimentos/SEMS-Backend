@@ -47,6 +47,10 @@ public interface IMembershipRepository
     /// <summary>Vinculos vigentes de una persona. Puede pertenecer a varias organizaciones.</summary>
     Task<List<Membership>> FindByUserIdAsync(Guid userId, CancellationToken ct = default);
 
+    /// <summary>
+    /// El vinculo de una persona con la organizacion, vigente o revocado. Hay a
+    /// lo sumo uno.
+    /// </summary>
     Task<Membership?> FindByOrganizationAndUserAsync(Guid organizationId, Guid userId,
         CancellationToken ct = default);
 }

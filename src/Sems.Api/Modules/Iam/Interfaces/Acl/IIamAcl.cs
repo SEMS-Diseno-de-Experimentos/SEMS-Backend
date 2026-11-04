@@ -17,4 +17,23 @@ public interface IIamAcl
 {
     /// <summary>Correo del usuario, o null si no existe.</summary>
     Task<string?> EmailOfAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Identificador de quien usa ese correo, o null si no hay nadie.
+    /// </summary>
+    /// <remarks>
+    /// Lo necesita organizaciones para dar acceso por correo: quien administra
+    /// una cadena conoce el correo de sus companeros, no su UUID. Pedirle el
+    /// identificador convertia la pantalla de accesos en algo que nadie podia
+    /// usar sin consultar la base de datos.
+    /// </remarks>
+    Task<Guid?> UserIdOfAsync(string? emailAddress, CancellationToken ct = default);
+
+    /// <summary>Correos de varios usuarios de una vez, indexados por su identificador.</summary>
+    /// <remarks>
+    /// Va en lote porque el listado de accesos los pide todos juntos, y hacerlo
+    /// uno a uno seria una consulta por fila.
+    /// </remarks>
+    Task<Dictionary<Guid, string>> EmailsOfAsync(IReadOnlyCollection<Guid> userIds,
+        CancellationToken ct = default);
 }

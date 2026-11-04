@@ -34,7 +34,8 @@ public sealed class AuthenticationController : ControllerBase
     [HttpPost("register")]
     public async Task<LoginResponse> Register([FromBody] RegisterRequest request)
     {
-        var result = await _authentication.RegisterAsync(request.EmailAddress, request.Password, request.Role);
+        var result = await _authentication.RegisterAsync(request.EmailAddress, request.Password,
+            request.Role, request.FullName, request.Segment);
         try { await _seeder.SeedForUserAsync(request.EmailAddress); } catch { /* ignore seeding errors */ }
         return LoginResponse.From(result);
     }
@@ -43,6 +44,12 @@ public sealed class AuthenticationController : ControllerBase
     [HttpPost("login")]
     public async Task<LoginResponse> Login([FromBody] LoginRequest request) =>
         LoginResponse.From(await _authentication.LoginAsync(request.EmailAddress, request.Password));
+
+    /// <summary>Signs in with a Google account, creating it the first time.</summary>
+    [HttpPost("google")]
+    public async Task<LoginResponse> Google([FromBody] GoogleSignInRequest request,
+        CancellationToken ct) =>
+        LoginResponse.From(await _authentication.SignInWithGoogleAsync(request.IdToken, ct));
 
     /// <summary>Issues a new token pair and rotates the refresh token provided.</summary>
     [HttpPost("refresh")]
@@ -87,6 +94,6 @@ public sealed class AuthenticationController : ControllerBase
     public async Task<MessageResponse> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         await _recovery.ResetPasswordAsync(request.Token, request.NewPassword);
-        return new MessageResponse("Contrasena actualizada correctamente.");
+        return new MessageResponse("Password updated successfully.");
     }
 }

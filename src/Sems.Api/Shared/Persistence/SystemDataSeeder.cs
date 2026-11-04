@@ -9,12 +9,34 @@ public class SystemDataSeeder
 {
     private readonly AuthenticationService _auth;
     private readonly SemsDbContext _context;
+    private readonly bool _enabled;
 
-    public SystemDataSeeder(AuthenticationService auth, SemsDbContext context)
+    public SystemDataSeeder(AuthenticationService auth, SemsDbContext context,
+        IConfiguration configuration)
     {
         _auth = auth;
         _context = context;
+        _enabled = DemoDataEnabled(configuration);
     }
+
+    /// <summary>
+    /// Si se cargan datos de demostracion al registrar una cuenta.
+    /// </summary>
+    /// <remarks>
+    /// <para>Apagado salvo que <c>Seeding:DemoData</c> (o <c>SEED_DEMO_DATA</c>)
+    /// valga <c>true</c>. Antes venia encendido, y eso hacia dos danos a toda
+    /// cuenta real: la primera pantalla mostraba una organizacion "Mi Hogar /
+    /// Empresa" con nueve aparatos inventados y consumos aleatorios, y ese local
+    /// ficticio agotaba el unico que incluye el plan de entrada, de modo que el
+    /// cliente no podia dar de alta el suyo sin cambiar de plan.</para>
+    ///
+    /// <para>Sigue disponible para las demostraciones: basta
+    /// <c>SEED_DEMO_DATA=true</c> en el entorno donde se vaya a ensenar.</para>
+    /// </remarks>
+    public static bool DemoDataEnabled(IConfiguration configuration) =>
+        string.Equals(configuration["Seeding:DemoData"]
+                      ?? Environment.GetEnvironmentVariable("SEED_DEMO_DATA"),
+            "true", StringComparison.OrdinalIgnoreCase);
 
     public async Task SeedAsync()
     {
@@ -35,6 +57,11 @@ public class SystemDataSeeder
 
     public async Task SeedForUserAsync(string email)
     {
+        if (!_enabled)
+        {
+            return;
+        }
+
         var userIdStr = await _context.Database.SqlQueryRaw<string>(
             "SELECT \"UserId\"::text FROM iam_users WHERE \"EmailAddress\" = {0} LIMIT 1", email)
             .FirstOrDefaultAsync();

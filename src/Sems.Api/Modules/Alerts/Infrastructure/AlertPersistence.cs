@@ -19,6 +19,20 @@ public sealed class AlertConfig : IEntityTypeConfiguration<Alert>
         b.Property(a => a.Status).HasMaxLength(20);
         b.HasIndex(a => a.UserId);
         b.HasIndex(a => a.DeviceId);
+
+        // La alerta apunta a la regla que la disparo, y ambas son opcionales
+        // porque una alerta puede venir de una u otra. SetNull: la alerta ya
+        // ocurrio y debe seguir constando aunque la regla se borre despues.
+        // DeviceId no lleva clave foranea: dm_devices es otro bounded context.
+        b.HasOne<AlertThreshold>()
+            .WithMany()
+            .HasForeignKey(a => a.ThresholdId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.HasOne<InactivityRule>()
+            .WithMany()
+            .HasForeignKey(a => a.InactivityRuleId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 
@@ -70,6 +84,13 @@ public sealed class NotificationLogConfig : IEntityTypeConfiguration<Notificatio
         b.Property(l => l.Status).HasMaxLength(20);
         b.Property(l => l.ErrorMessage).HasColumnType("text");
         b.HasIndex(l => l.AlertId);
+
+        // El registro de notificacion es auditoria: queda constancia de que se
+        // aviso, incluso si la alerta se borra.
+        b.HasOne<Alert>()
+            .WithMany()
+            .HasForeignKey(l => l.AlertId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

@@ -27,6 +27,10 @@ public static class AnalyticsResources
         [property: JsonPropertyName("tariff_used")] double TariffUsed,
         [property: JsonPropertyName("error_margin_percentage")] double ErrorMarginPercentage);
 
+    public sealed record RecomputeInsightsRequest(
+        [property: JsonPropertyName("user_id")]
+        [Required(ErrorMessage = "is required")] string UserId);
+
     public sealed record CreateRecommendationRequest(
         [property: JsonPropertyName("user_id")]
         [Required(ErrorMessage = "is required")] string UserId,
@@ -198,5 +202,17 @@ public static class AnalyticsResources
         public static ConsumptionRankingResponse From(ConsumptionRanking c) => new(c.Id.ToString(),
             c.UserId, c.PeriodType, c.PeriodStart, c.PeriodEnd,
             c.Rankings().Select(RankingItemResource.From).ToList(), c.GeneratedAt, c.CreatedAt);
+    }
+
+    /// <summary>Lo producido por una pasada del motor de hallazgos.</summary>
+    public sealed record InsightsResponse(
+        [property: JsonPropertyName("anomalies")] List<AnomalyResponse> Anomalies,
+        [property: JsonPropertyName("recommendations")] List<RecommendationResponse> Recommendations,
+        [property: JsonPropertyName("bill_predictions")] List<BillPredictionResponse> BillPredictions)
+    {
+        public static InsightsResponse From(Application.InsightEngine.Hallazgos h) =>
+            new(h.Anomalias.Select(AnomalyResponse.From).ToList(),
+                h.Recomendaciones.Select(RecommendationResponse.From).ToList(),
+                h.Proyecciones.Select(BillPredictionResponse.From).ToList());
     }
 }

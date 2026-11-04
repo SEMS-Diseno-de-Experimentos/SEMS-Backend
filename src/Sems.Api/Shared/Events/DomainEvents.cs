@@ -94,10 +94,17 @@ public static class DomainEvents
 
     /// <summary>
     /// Lectura del medidor ya validada y almacenada. La escuchan analytics
-    /// (rankings y proyecciones) y alerts (evaluacion de umbrales).
+    /// (rankings y proyecciones) y alerts (evaluacion de umbrales y de demanda).
     /// </summary>
+    /// <remarks>
+    /// <para><c>SiteId</c> y <c>PowerKw</c> son del local, no de la lectura: el
+    /// evento los lleva para que alerts pueda evaluar la demanda sin consultar
+    /// el modulo de energia. Vienen vacios cuando la lectura no esta atada a un
+    /// medidor con local, que es el caso de las lecturas por dispositivo.</para>
+    /// </remarks>
     public sealed record ReadingProcessed(Guid UserId, Guid? DeviceId, Guid? MeterId,
-        decimal ConsumptionKwh, DateTime RecordedAt) : IDomainEvent
+        decimal ConsumptionKwh, DateTime RecordedAt, Guid? SiteId = null,
+        double? PowerKw = null) : IDomainEvent
     {
         public DateTime OccurredAt { get; init; } = DateTime.UtcNow;
     }

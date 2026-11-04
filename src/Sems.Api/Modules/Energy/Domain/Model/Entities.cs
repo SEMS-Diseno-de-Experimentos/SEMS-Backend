@@ -14,6 +14,26 @@ public class EnergyMeter
 
     public string UserId { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Local en el que esta instalado el medidor.
+    /// </summary>
+    /// <remarks>
+    /// <para>Es obligatorio. La tarifa, la potencia contratada y el recibo son
+    /// del suministro, no de la persona que registra el aparato: sin el local,
+    /// el consumo medido no se puede valorizar ni atribuir a nadie.</para>
+    /// </remarks>
+    public Guid SiteId { get; private set; }
+
+    /// <summary>
+    /// Zona del local donde esta el medidor, si ya esta definida.
+    /// </summary>
+    /// <remarks>
+    /// Opcional a proposito: un local puede abrir antes de tener sus zonas
+    /// delimitadas, y obligar a inventarse una solo para dar de alta el
+    /// medidor ensucia el dato que luego sirve para repartir el consumo.
+    /// </remarks>
+    public Guid? ZoneId { get; private set; }
+
     public string MeterSerial { get; private set; } = string.Empty;
 
     public string? Model { get; private set; }
@@ -38,12 +58,17 @@ public class EnergyMeter
     {
     }
 
-    public static EnergyMeter Register(string? userId, string? meterSerial, string? model,
-        string? brand, string? location, string? firmwareVersion, double? maxPowerWatts)
+    public static EnergyMeter Register(string? userId, Guid siteId, Guid? zoneId,
+        string? meterSerial, string? model, string? brand, string? location,
+        string? firmwareVersion, double? maxPowerWatts)
     {
         if (string.IsNullOrWhiteSpace(userId))
         {
             throw AppException.Validation("user_id is required");
+        }
+        if (siteId == Guid.Empty)
+        {
+            throw AppException.Validation("site_id is required");
         }
         if (string.IsNullOrWhiteSpace(meterSerial))
         {
@@ -55,6 +80,8 @@ public class EnergyMeter
         {
             Id = Guid.NewGuid(),
             UserId = userId.Trim(),
+            SiteId = siteId,
+            ZoneId = zoneId,
             MeterSerial = meterSerial.Trim(),
             Model = model,
             Brand = brand,
@@ -75,6 +102,20 @@ public class EnergyMeter
     public void Deactivate()
     {
         Status = MeterStatus.inactive;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Traslada el medidor a otra zona del mismo local, o lo deja sin zona.
+    /// </summary>
+    /// <remarks>
+    /// Que la zona sea del mismo local lo comprueba la capa de aplicacion, que
+    /// es la que puede preguntarselo al modulo de organizaciones. Aqui solo se
+    /// guarda la decision.
+    /// </remarks>
+    public void ReassignZone(Guid? zoneId)
+    {
+        ZoneId = zoneId;
         UpdatedAt = DateTime.UtcNow;
     }
 }

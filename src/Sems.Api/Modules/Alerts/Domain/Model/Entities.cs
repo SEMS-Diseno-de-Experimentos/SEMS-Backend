@@ -90,6 +90,23 @@ public class Alert
     public DateTime TriggeredAt { get; private set; }
     public DateTime? ResolvedAt { get; private set; }
 
+    // --- el dato detras del aviso ---
+    //
+    // El titulo y el mensaje son una frase en ingles, y el cliente los pinta
+    // tal cual: una interfaz en espanol acaba mostrando "Demand close to the
+    // contracted limit". Guardar aparte los numeros que dispararon la alerta
+    // permite que cada cliente escriba la frase en su idioma, y de paso que la
+    // pantalla los use para algo mas que leerlos.
+
+    /// <summary>Local al que se refiere el aviso. Solo en las de demanda.</summary>
+    public Guid? SiteId { get; private set; }
+
+    /// <summary>Demanda medida, en kW. Solo en las de demanda.</summary>
+    public double? MeasuredKw { get; private set; }
+
+    /// <summary>Potencia contratada del local, en kW. Solo en las de demanda.</summary>
+    public double? ContractedKw { get; private set; }
+
     private Alert()
     {
     }
@@ -110,6 +127,25 @@ public class Alert
         Status = string.IsNullOrWhiteSpace(status) ? StatusActive : status,
         TriggeredAt = triggeredAt ?? DateTime.UtcNow
     };
+
+    /// <summary>
+    /// Aviso de demanda, con los numeros que lo justifican.
+    /// </summary>
+    /// <remarks>
+    /// La severidad distingue acercarse de haber superado lo contratado, y de
+    /// <c>MeasuredKw</c> y <c>ContractedKw</c> sale el margen que queda, asi
+    /// que el cliente puede redactar el aviso sin leer el mensaje.
+    /// </remarks>
+    public static Alert RaiseDemand(Guid userId, Guid siteId, string title, string message,
+        string severity, double measuredKw, double contractedKw)
+    {
+        var alerta = Raise(userId, null, null, null, "DEMAND", title, message, severity, null,
+            DateTime.UtcNow);
+        alerta.SiteId = siteId;
+        alerta.MeasuredKw = measuredKw;
+        alerta.ContractedKw = contractedKw;
+        return alerta;
+    }
 
     /// <summary>Al pasar a resuelta se sella la fecha si el cliente no la envio.</summary>
     public void UpdateStatus(string newStatus, DateTime? resolvedAt)
@@ -359,6 +395,12 @@ public class DemandRule
 
     public bool Active { get; private set; }
 
+    /// <summary>Nivel con el que se aviso la ultima vez. Null si nunca se aviso.</summary>
+    public DemandLevel? LastAlertLevel { get; private set; }
+
+    /// <summary>Cuando se aviso la ultima vez.</summary>
+    public DateTime? LastAlertAt { get; private set; }
+
     public DateTime CreatedAt { get; private set; }
 
     public DateTime UpdatedAt { get; private set; }
@@ -366,6 +408,17 @@ public class DemandRule
     private DemandRule()
     {
     }
+
+    /// <summary>
+    /// Cuanto se calla la regla tras avisar del mismo nivel.
+    /// </summary>
+    /// <remarks>
+    /// Un medidor que reporta cada minuto dispararia sesenta alertas por hora
+    /// mientras el local trabaja al 90% de lo contratado, y el cliente dejaria
+    /// de leerlas. Media hora es suficiente para que el aviso siga siendo
+    /// accionable sin convertirse en ruido.
+    /// </remarks>
+    public static readonly TimeSpan Silencio = TimeSpan.FromMinutes(30);
 
     public static DemandRule Create(Guid siteId, Guid userId, string? ruleName,
         double contractedPowerKw, double? warningPercent, bool? active)
@@ -421,6 +474,52 @@ public class DemandRule
 
     /// <summary>Cuantos kW quedan hasta superar lo contratado. Negativo si ya se supero.</summary>
     public double MargenKw(double demandaKw) => ContractedPowerKw - demandaKw;
+
+    /// <summary>Si este nivel merece un aviso ahora, o si ya se dijo hace poco.</summary>
+    /// <remarks>
+    /// Empeorar siempre avisa: pasar de WARNING a EXCEEDED es noticia nueva
+    /// aunque el aviso anterior sea de hace un minuto. Repetir el mismo nivel
+    /// espera a que pase el silencio.
+    /// </remarks>
+    public bool MereceAviso(DemandLevel nivel, DateTime ahora)
+    {
+        if (nivel == DemandLevel.OK)
+        {
+            return false;
+        }
+        if (LastAlertLevel is null || LastAlertAt is null)
+        {
+            return true;
+        }
+        if (nivel > LastAlertLevel)
+        {
+            return true;
+        }
+        return ahora - LastAlertAt.Value >= Silencio;
+    }
+
+    /// <summary>Deja constancia de un aviso emitido.</summary>
+    public void AnotarAviso(DemandLevel nivel, DateTime ahora)
+    {
+        LastAlertLevel = nivel;
+        LastAlertAt = ahora;
+        UpdatedAt = ahora;
+    }
+
+    /// <summary>
+    /// La demanda volvio a la normalidad: se olvida el ultimo aviso para que el
+    /// siguiente episodio avise de inmediato y no espere el silencio.
+    /// </summary>
+    public void AnotarNormalidad()
+    {
+        if (LastAlertLevel is null)
+        {
+            return;
+        }
+        LastAlertLevel = null;
+        LastAlertAt = null;
+        UpdatedAt = DateTime.UtcNow;
+    }
 
     public void UpdateDetails(string? ruleName, double contractedPowerKw, double warningPercent)
     {

@@ -51,6 +51,13 @@ public sealed class SubscriptionConfig : IEntityTypeConfiguration<Subscription>
         b.Property(s => s.StripeSubscriptionId).HasMaxLength(120);
         b.HasIndex(s => s.UserId);
         b.HasIndex(s => s.StripeSubscriptionId);
+
+        // No se borra un plan que todavia tiene suscriptores. UserId no lleva
+        // clave foranea: Iam es otro bounded context (y aqui es texto, no uuid).
+        b.HasOne<SubscriptionPlan>()
+            .WithMany()
+            .HasForeignKey(s => s.PlanId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

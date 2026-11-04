@@ -14,23 +14,98 @@ public sealed class EnergyCommandService
     private readonly IConsumptionAlertRepository _alerts;
     private readonly IUserGoalRepository _goals;
     private readonly IEnergyPricingProvider _pricing;
+    private readonly ISiteCatalog _sites;
+    private readonly IMeterAllowance? _cupos;
     private readonly IDomainEventBus _bus;
 
     public EnergyCommandService(IEnergyMeterRepository meters, IEnergyReadingRepository readings,
-        IConsumptionAlertRepository alerts, IUserGoalRepository goals, IEnergyPricingProvider pricing, IDomainEventBus bus)
+        IConsumptionAlertRepository alerts, IUserGoalRepository goals, IEnergyPricingProvider pricing,
+        ISiteCatalog sites, IDomainEventBus bus, IMeterAllowance? cupos = null)
     {
         _meters = meters;
         _readings = readings;
         _alerts = alerts;
         _goals = goals;
         _pricing = pricing;
+        _sites = sites;
+        _cupos = cupos;
         _bus = bus;
     }
 
+    /// <summary>
+    /// Comprueba que al local le queda cupo de medidores en su plan.
+    /// </summary>
+    /// <remarks>
+    /// <para>Se cuentan solo los vigentes: un medidor dado de baja ya no ocupa
+    /// sitio, que es justo lo que promete US23.</para>
+    ///
+    /// <para>Sin adaptador de cupos, o sin plan detras del local, no se
+    /// bloquea nada. Es el mismo criterio que con los locales: quien esta
+    /// probando el producto tiene que poder instalar su primer medidor.</para>
+    /// </remarks>
+    private async Task RequireMeterAllowanceAsync(Guid siteId, CancellationToken ct)
+    {
+        if (_cupos is null)
+        {
+            return;
+        }
+
+        var cupo = await _cupos.MeterAllowanceOfSiteAsync(siteId, ct);
+        if (cupo is null)
+        {
+            return;
+        }
+
+        var instalados = (await _meters.FindBySiteIdAsync(siteId, ct))
+            .Count(m => m.Status != MeterStatus.inactive);
+        if (instalados >= cupo.MetersIncluded)
+        {
+            throw AppException.Conflict(
+                $"the {cupo.PlanName} plan includes {cupo.MetersIncluded} meter(s) per site; "
+                + "change the plan to register another one");
+        }
+    }
+
+    /// <summary>
+    /// Comprueba que el local existe y esta vigente antes de colgarle nada.
+    /// </summary>
+    /// <remarks>
+    /// Un local que no existe es un 404 y uno archivado es un 409: son dos
+    /// situaciones distintas y el cliente actua distinto ante cada una.
+    /// </remarks>
+    private async Task RequireActiveSiteAsync(Guid siteId, CancellationToken ct)
+    {
+        if (!await _sites.SiteExistsAsync(siteId, ct))
+        {
+            throw AppException.NotFound($"site '{siteId}' not found");
+        }
+        if (!await _sites.SiteIsActiveAsync(siteId, ct))
+        {
+            throw AppException.Conflict("the site is not active");
+        }
+    }
+
+    /// <summary>La zona, si se indica, tiene que ser de ese mismo local.</summary>
+    private async Task RequireZoneOfSiteAsync(Guid? zoneId, Guid siteId, CancellationToken ct)
+    {
+        if (zoneId is null)
+        {
+            return;
+        }
+        if (!await _sites.ZoneBelongsToSiteAsync(zoneId.Value, siteId, ct))
+        {
+            // Sin esta comprobacion se podria colgar un medidor de la zona de
+            // otro establecimiento, y su consumo quedaria atribuido al area
+            // equivocada, que es justo el dato por el que el cliente paga.
+            throw AppException.Validation(
+                $"zone '{zoneId}' does not belong to that site");
+        }
+    }
+
     /// <summary>Vincular dos veces el mismo numero de serie es un conflicto.</summary>
-    public async Task<EnergyMeter> RegisterMeterAsync(string? userId, string? meterSerial,
-        string? model, string? brand, string? location, string? firmwareVersion,
-        double? maxPowerWatts, CancellationToken ct = default)
+    public async Task<EnergyMeter> RegisterMeterAsync(string? userId, Guid siteId, Guid? zoneId,
+        string? meterSerial, string? model, string? brand, string? location,
+        string? firmwareVersion, double? maxPowerWatts, CancellationToken ct = default)
     {
         if (!string.IsNullOrWhiteSpace(meterSerial)
             && await _meters.FindBySerialAsync(meterSerial.Trim(), ct) is not null)
@@ -38,8 +113,27 @@ public sealed class EnergyCommandService
             throw AppException.Conflict($"Meter '{meterSerial}' is already registered");
         }
 
-        return await _meters.SaveAsync(EnergyMeter.Register(userId, meterSerial, model, brand,
-            location, firmwareVersion, maxPowerWatts), ct);
+        if (siteId == Guid.Empty)
+        {
+            throw AppException.Validation("site_id is required");
+        }
+        await RequireActiveSiteAsync(siteId, ct);
+        await RequireZoneOfSiteAsync(zoneId, siteId, ct);
+        await RequireMeterAllowanceAsync(siteId, ct);
+
+        return await _meters.SaveAsync(EnergyMeter.Register(userId, siteId, zoneId, meterSerial,
+            model, brand, location, firmwareVersion, maxPowerWatts), ct);
+    }
+
+    /// <summary>Traslada un medidor a otra zona del mismo local (US22).</summary>
+    public async Task<EnergyMeter> ReassignMeterZoneAsync(Guid meterId, Guid? zoneId,
+        CancellationToken ct = default)
+    {
+        var meter = await _meters.FindByIdAsync(meterId, ct)
+                    ?? throw AppException.NotFound($"Meter '{meterId}' not found");
+        await RequireZoneOfSiteAsync(zoneId, meter.SiteId, ct);
+        meter.ReassignZone(zoneId);
+        return await _meters.SaveAsync(meter, ct);
     }
 
     public async Task<EnergyMeter> DeactivateMeterAsync(Guid meterId, CancellationToken ct = default)
@@ -66,25 +160,32 @@ public sealed class EnergyCommandService
         var reading = EnergyReading.Record(userId, meterId, deviceId, measurement, timestamp,
             readingType, phase);
 
+        // El medidor se busca antes de publicar porque el evento viaja con el
+        // local al que pertenece: sin eso, alerts tendria que preguntarselo a
+        // energia para poder evaluar la demanda.
+        EnergyMeter? meter = null;
+        if (Guid.TryParse(meterId, out var meterGuid))
+        {
+            meter = await _meters.FindByIdAsync(meterGuid, ct);
+        }
+
         if (Guid.TryParse(userId, out var userGuid))
         {
             _bus.Publish(new DomainEvents.ReadingProcessed(userGuid,
                 Guid.TryParse(deviceId, out var d) ? d : null,
                 Guid.TryParse(meterId, out var m) ? m : null,
-                (decimal)energyKwh, reading.Timestamp));
+                (decimal)energyKwh, reading.Timestamp,
+                meter is { SiteId: var sitio } && sitio != Guid.Empty ? sitio : null,
+                powerWatts > 0 ? powerWatts / 1000d : null));
         }
 
         var saved = await _readings.SaveAsync(reading, ct);
 
         // El medidor deja constancia de que sigue vivo.
-        if (Guid.TryParse(meterId, out var meterGuid))
+        if (meter is not null)
         {
-            var meter = await _meters.FindByIdAsync(meterGuid, ct);
-            if (meter is not null)
-            {
-                meter.UpdateLastSeen();
-                await _meters.SaveAsync(meter, ct);
-            }
+            meter.UpdateLastSeen();
+            await _meters.SaveAsync(meter, ct);
         }
 
         return saved;
@@ -124,7 +225,7 @@ public sealed class EnergyCommandService
 
     /// <summary>Tarifa comercial vigente para una categoria del pliego.</summary>
     public CommercialTariff CurrentTariff(string? tariffCategory) =>
-        _pricing.CurrentTariff(tariffCategory);
+        _pricing.CurrentTariff(TariffCategories.Normalize(tariffCategory));
 
     /// <summary>
     /// Estima la factura del mes de un local a partir de su consumo por franja
@@ -147,7 +248,7 @@ public sealed class EnergyCommandService
             throw AppException.Validation("contracted_power_kw must be greater than zero");
         }
 
-        return _pricing.CurrentTariff(tariffCategory)
+        return _pricing.CurrentTariff(TariffCategories.Normalize(tariffCategory))
             .Calcular(kwhPunta, kwhFueraDePunta, demandaMaximaKw, potenciaContratadaKw);
     }
 
@@ -195,6 +296,14 @@ public sealed class EnergyQueryService
     public async Task<EnergyMeter> MeterByIdAsync(Guid meterId, CancellationToken ct = default) =>
         await _meters.FindByIdAsync(meterId, ct)
         ?? throw AppException.NotFound($"Meter '{meterId}' not found");
+
+    /// <summary>Medidores instalados en un local: la cobertura de medicion (US20).</summary>
+    public Task<List<EnergyMeter>> MetersBySiteAsync(Guid siteId, CancellationToken ct = default) =>
+        _meters.FindBySiteIdAsync(siteId, ct);
+
+    /// <summary>Medidores de una zona concreta del local (US21).</summary>
+    public Task<List<EnergyMeter>> MetersByZoneAsync(Guid zoneId, CancellationToken ct = default) =>
+        _meters.FindByZoneIdAsync(zoneId, ct);
 
     public Task<List<EnergyMeter>> MetersByUserAsync(string userId, CancellationToken ct = default) =>
         _meters.FindByUserIdAsync(userId, ct);

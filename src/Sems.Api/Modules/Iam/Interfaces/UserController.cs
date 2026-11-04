@@ -1,13 +1,20 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Sems.Api.Modules.Iam.Application;
 using Sems.Api.Modules.Iam.Domain.Repositories;
 using Sems.Api.Shared.Errors;
 
 namespace Sems.Api.Modules.Iam.Interfaces;
 
 /// <summary>Details of the user the request token belongs to.</summary>
-public sealed record UserResource(Guid UserId, string EmailAddress, List<string> Roles);
+public sealed record UserResource(Guid UserId, string EmailAddress, List<string> Roles,
+    string? FullName, string? Segment)
+{
+    public static UserResource From(Sems.Api.Modules.Iam.Domain.Model.User user) =>
+        new(user.UserId, user.EmailAddress, new List<string> { user.Role.ToString() },
+            user.FullName, user.Segment?.ToString());
+}
 
 /// <summary>
 /// Consulta del usuario autenticado.
@@ -24,8 +31,13 @@ public sealed record UserResource(Guid UserId, string EmailAddress, List<string>
 public sealed class UserController : ControllerBase
 {
     private readonly IUserRepository _users;
+    private readonly UserProfileService _profiles;
 
-    public UserController(IUserRepository users) => _users = users;
+    public UserController(IUserRepository users, UserProfileService profiles)
+    {
+        _users = users;
+        _profiles = profiles;
+    }
 
     /// <summary>Returns the user who owns the token used to call.</summary>
     [HttpGet("me")]
@@ -33,9 +45,18 @@ public sealed class UserController : ControllerBase
     {
         var user = await _users.FindByIdAsync(UsuarioDelToken(), ct)
             ?? throw AppException.NotFound("user not found");
-        return new UserResource(user.UserId, user.EmailAddress,
-            new List<string> { user.Role.ToString() });
+        return UserResource.From(user);
     }
+
+    /// <summary>Updates the caller's own name and segment.</summary>
+    /// <remarks>
+    /// El usuario sale del token y no de la ruta: nadie puede renombrar a otro.
+    /// </remarks>
+    [HttpPut("me")]
+    public async Task<UserResource> UpdateMe([FromBody] AuthResources.UpdateProfileRequest request,
+        CancellationToken ct) =>
+        UserResource.From(await _profiles.UpdateProfileAsync(UsuarioDelToken(), request.FullName,
+            request.Segment, ct));
 
     /// <summary>
     /// Lee el identificador del usuario desde el token.

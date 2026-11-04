@@ -19,10 +19,12 @@ public sealed class BCryptPasswordHashingService : IPasswordHashingService
         {
             return BCrypt.Net.BCrypt.Verify(plainPassword, passwordHash);
         }
-        catch (BCrypt.Net.SaltParseException)
+        catch (Exception ex) when (ex is BCrypt.Net.SaltParseException or ArgumentException)
         {
             // Un hash con formato invalido no debe reventar el inicio de sesion:
-            // simplemente no coincide.
+            // simplemente no coincide. Uno truncado (cabecera valida y sal
+            // incompleta) no llega a SaltParseException: BCrypt falla al cortar
+            // la cadena con ArgumentOutOfRangeException.
             return false;
         }
     }

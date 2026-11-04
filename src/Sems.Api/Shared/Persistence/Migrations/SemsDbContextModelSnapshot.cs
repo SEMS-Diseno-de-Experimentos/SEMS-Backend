@@ -32,11 +32,17 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<double?>("ContractedKw")
+                        .HasColumnType("double precision");
+
                     b.Property<Guid?>("DeviceId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("InactivityRuleId")
                         .HasColumnType("uuid");
+
+                    b.Property<double?>("MeasuredKw")
+                        .HasColumnType("double precision");
 
                     b.Property<string>("Message")
                         .HasColumnType("text");
@@ -47,6 +53,9 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<string>("Severity")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("SiteId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -69,6 +78,10 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.HasKey("AlertId");
 
                     b.HasIndex("DeviceId");
+
+                    b.HasIndex("InactivityRuleId");
+
+                    b.HasIndex("ThresholdId");
 
                     b.HasIndex("UserId");
 
@@ -135,6 +148,12 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastAlertAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("LastAlertLevel")
+                        .HasColumnType("integer");
 
                     b.Property<string>("RuleName")
                         .HasMaxLength(160)
@@ -852,6 +871,9 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.Property<DateTime>("RegisteredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -865,12 +887,19 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<Guid?>("ZoneId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MeterSerial")
                         .IsUnique();
 
+                    b.HasIndex("SiteId");
+
                     b.HasIndex("UserId");
+
+                    b.HasIndex("ZoneId");
 
                     b.ToTable("em_energy_meters", (string)null);
                 });
@@ -1009,6 +1038,10 @@ namespace Sems.Api.Shared.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("FullName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1016,6 +1049,10 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.Property<string>("Role")
                         .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Segment")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
@@ -1106,6 +1143,8 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.HasKey("MembershipId");
 
                     b.HasIndex("OrganizationId");
+
+                    b.HasIndex("SiteId");
 
                     b.HasIndex("UserId");
 
@@ -1337,6 +1376,8 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.HasKey("PaymentId");
 
+                    b.HasIndex("PaymentMethodId");
+
                     b.HasIndex("StripePaymentIntentId");
 
                     b.HasIndex("SubscriptionId");
@@ -1494,6 +1535,8 @@ namespace Sems.Api.Shared.Persistence.Migrations
 
                     b.HasKey("SubscriptionId");
 
+                    b.HasIndex("PlanId");
+
                     b.HasIndex("StripeSubscriptionId");
 
                     b.HasIndex("UserId");
@@ -1542,12 +1585,136 @@ namespace Sems.Api.Shared.Persistence.Migrations
                     b.ToTable("sb_subscription_plans", (string)null);
                 });
 
+            modelBuilder.Entity("Sems.Api.Modules.Alerts.Domain.Model.Alert", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Alerts.Domain.Model.InactivityRule", null)
+                        .WithMany()
+                        .HasForeignKey("InactivityRuleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Sems.Api.Modules.Alerts.Domain.Model.AlertThreshold", null)
+                        .WithMany()
+                        .HasForeignKey("ThresholdId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Alerts.Domain.Model.NotificationLog", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Alerts.Domain.Model.Alert", null)
+                        .WithMany()
+                        .HasForeignKey("AlertId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Devices.Domain.Model.DeviceBinding", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Devices.Domain.Model.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Devices.Domain.Model.DeviceConfiguration", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Devices.Domain.Model.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Devices.Domain.Model.DeviceEvent", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Devices.Domain.Model.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Iam.Domain.Model.RefreshToken", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Iam.Domain.Model.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Iam.Domain.Model.UserAuthToken", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Iam.Domain.Model.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Organizations.Domain.Model.Membership", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Organizations.Domain.Model.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Sems.Api.Modules.Organizations.Domain.Model.Site", null)
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Organizations.Domain.Model.Site", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Organizations.Domain.Model.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Organizations.Domain.Model.Zone", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Organizations.Domain.Model.Site", null)
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Payments.Domain.Model.Invoice", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Payments.Domain.Model.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Payments.Domain.Model.Payment", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Payments.Domain.Model.PaymentMethodEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentMethodId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("Sems.Api.Modules.Subscriptions.Domain.Model.PlanFeature", b =>
                 {
                     b.HasOne("Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionPlan", null)
                         .WithMany("PlanFeatures")
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Sems.Api.Modules.Subscriptions.Domain.Model.Subscription", b =>
+                {
+                    b.HasOne("Sems.Api.Modules.Subscriptions.Domain.Model.SubscriptionPlan", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

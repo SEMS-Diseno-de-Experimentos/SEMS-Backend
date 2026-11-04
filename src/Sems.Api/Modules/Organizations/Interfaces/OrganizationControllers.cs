@@ -13,12 +13,14 @@ public sealed class OrganizationController : ControllerBase
 {
     private readonly OrganizationCommandService _commands;
     private readonly OrganizationQueryService _queries;
+    private readonly Sems.Api.Modules.Iam.Interfaces.Acl.IIamAcl _iam;
 
     public OrganizationController(OrganizationCommandService commands,
-        OrganizationQueryService queries)
+        OrganizationQueryService queries, Sems.Api.Modules.Iam.Interfaces.Acl.IIamAcl iam)
     {
         _commands = commands;
         _queries = queries;
+        _iam = iam;
     }
 
     /// <summary>Registers an organization and makes its creator the administrator.</summary>
@@ -74,23 +76,52 @@ public sealed class OrganizationController : ControllerBase
 
     /// <summary>People with access to the organization.</summary>
     [HttpGet("{organizationId}/members")]
-    public async Task<List<MembershipResource>> ListMembers(string organizationId)
+    public async Task<List<MembershipResource>> ListMembers(string organizationId,
+        CancellationToken ct)
     {
         var vinculos = await _queries.ListMembershipsAsync(ParseId(organizationId, "organization_id"));
-        return vinculos.Select(MembershipResource.From).ToList();
+        var correos = await _iam.EmailsOfAsync(vinculos.Select(v => v.UserId).Distinct().ToList(), ct);
+        return vinculos
+            .Select(v => MembershipResource.From(v,
+                correos.TryGetValue(v.UserId, out var correo) ? correo : null))
+            .ToList();
     }
 
     /// <summary>Grants access to a person, or changes their existing access.</summary>
     [HttpPost("{organizationId}/members")]
     public async Task<ActionResult<MembershipResource>> GrantMembership(string organizationId,
-        [FromBody] GrantMembershipRequest request)
+        [FromBody] GrantMembershipRequest request, CancellationToken ct)
     {
+        var usuario = await ResolverUsuarioAsync(request, ct);
         var vinculo = await _commands.GrantMembershipAsync(
-            ParseId(organizationId, "organization_id"), ParseId(request.UserId, "user_id"),
+            ParseId(organizationId, "organization_id"), usuario,
             request.Role, string.IsNullOrWhiteSpace(request.SiteId)
                 ? null
-                : ParseId(request.SiteId, "site_id"));
-        return StatusCode(StatusCodes.Status201Created, MembershipResource.From(vinculo));
+                : ParseId(request.SiteId, "site_id"), ct);
+        return StatusCode(StatusCodes.Status201Created,
+            MembershipResource.From(vinculo, await _iam.EmailOfAsync(usuario, ct)));
+    }
+
+    /// <summary>
+    /// Resuelve a quien se le da acceso, por correo o por identificador.
+    /// </summary>
+    /// <remarks>
+    /// Un correo que no corresponde a ninguna cuenta responde 404 y no 400: la
+    /// peticion esta bien formada, lo que falta es que esa persona se registre.
+    /// </remarks>
+    private async Task<Guid> ResolverUsuarioAsync(GrantMembershipRequest request,
+        CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(request.UserId))
+        {
+            return ParseId(request.UserId, "user_id");
+        }
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            throw AppException.Validation("either email or user_id is required");
+        }
+        return await _iam.UserIdOfAsync(request.Email, ct)
+               ?? throw AppException.NotFound($"no account is registered with '{request.Email}'");
     }
 
     [HttpDelete("{organizationId}/members/{membershipId}")]

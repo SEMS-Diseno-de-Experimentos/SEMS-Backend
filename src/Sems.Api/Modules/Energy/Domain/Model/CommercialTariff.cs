@@ -137,9 +137,11 @@ public sealed record CommercialTariff(
     {
         var energia = CostoDeEnergia(kwhPunta, kwhFueraDePunta);
         var potencia = CostoDePotencia(demandaMaximaKw, potenciaContratadaKw);
-        var subtotal = energia + potencia + CargoFijoMensual;
-        var impuesto = subtotal * Igv;
+        var subtotal = Redondear(energia + potencia + CargoFijoMensual);
+        var impuesto = Redondear(subtotal * Igv);
 
+        // El total es la suma de lo que ya se muestra redondeado. Redondearlo
+        // aparte podia descuadrar un centimo: 13.08 + 2.35 salia 15.44.
         return new BillBreakdown(
             KwhPunta: kwhPunta,
             KwhFueraDePunta: kwhFueraDePunta,
@@ -149,9 +151,9 @@ public sealed record CommercialTariff(
             CostoEnergia: Redondear(energia),
             CostoPotencia: Redondear(potencia),
             CargoFijo: Redondear(CargoFijoMensual),
-            Subtotal: Redondear(subtotal),
-            Igv: Redondear(impuesto),
-            Total: Redondear(subtotal + impuesto),
+            Subtotal: subtotal,
+            Igv: impuesto,
+            Total: subtotal + impuesto,
             Currency: Currency);
     }
 

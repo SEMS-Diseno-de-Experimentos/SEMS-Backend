@@ -42,6 +42,12 @@ public sealed class DeviceBindingConfig : IEntityTypeConfiguration<DeviceBinding
         builder.Property(b => b.BindingStatus).HasConversion<string>().HasMaxLength(20);
         builder.HasIndex(b => b.DeviceId);
         builder.HasIndex(b => b.UserId);
+
+        // La vinculacion existe mientras exista el dispositivo.
+        builder.HasOne<Device>()
+            .WithMany()
+            .HasForeignKey(b => b.DeviceId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -53,6 +59,12 @@ public sealed class DeviceConfigurationConfig : IEntityTypeConfiguration<DeviceC
         builder.HasKey(c => c.ConfigurationId);
         builder.Property(c => c.ConfigKey).HasMaxLength(120).IsRequired();
         builder.HasIndex(c => new { c.DeviceId, c.ConfigKey }).IsUnique();
+
+        // La configuracion es parte del dispositivo: sin el no tiene sentido.
+        builder.HasOne<Device>()
+            .WithMany()
+            .HasForeignKey(c => c.DeviceId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -64,6 +76,12 @@ public sealed class DeviceEventConfig : IEntityTypeConfiguration<DeviceEvent>
         builder.HasKey(e => e.EventId);
         builder.Property(e => e.EventType).HasMaxLength(40).IsRequired();
         builder.HasIndex(e => e.DeviceId);
+
+        // Los eventos son el historial del dispositivo y se van con el.
+        builder.HasOne<Device>()
+            .WithMany()
+            .HasForeignKey(e => e.DeviceId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -90,8 +108,10 @@ public sealed class DeviceRepository : IDeviceRepository
     public Task<Device?> FindByIdAsync(Guid deviceId, CancellationToken ct = default) =>
         _db.Set<Device>().FirstOrDefaultAsync(d => d.DeviceId == deviceId, ct);
 
+    /// <summary>Dispositivos vigentes. Los dados de baja no salen, igual que en el resto de listados.</summary>
     public Task<List<Device>> FindAllAsync(CancellationToken ct = default) =>
-        _db.Set<Device>().OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
+        _db.Set<Device>().Where(d => d.Status != DeviceStatus.REMOVED)
+            .OrderByDescending(d => d.RegisteredAt).ToListAsync(ct);
 
     /// <summary>Dispositivos vigentes del usuario. Los borrados no salen.</summary>
     /// <remarks>
