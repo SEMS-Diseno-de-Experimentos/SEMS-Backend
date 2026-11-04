@@ -219,7 +219,7 @@ public sealed class AuthenticationService
             var r = new Sems.Api.Modules.Analytics.Domain.Model.RankingItem(
                 rank++, 
                 dc.DeviceId.ToString(), 
-                dc.DeviceName, 
+                dc.DeviceName ?? "Unknown device",
                 dc.TotalKwh, 
                 dc.CostEstimateSoles, 
                 0, 

@@ -18,6 +18,20 @@ public interface IGoogleTokenVerifier
     /// Para que aplicacion se emitio. Si no es la nuestra, el token es de otro
     /// sitio y no sirve aqui por muy valido que sea.
     /// </param>
+    /// <param name="Email">
+    /// El correo de la cuenta de Google. Es la identidad con la que se busca al
+    /// usuario, y con la que se le crea si es la primera vez que entra.
+    /// </param>
+    /// <param name="EmailVerified">
+    /// Si Google comprobo que ese correo es de quien lo presenta. Cuando es
+    /// falso se rechaza la entrada: un correo sin verificar permitiria entrar
+    /// con la direccion de otra persona.
+    /// </param>
+    /// <param name="Name">
+    /// El nombre para mostrar, tal y como lo da Google. Es opcional porque no
+    /// todas las cuentas lo publican; entonces llega null y la cuenta se crea
+    /// sin nombre.
+    /// </param>
     public sealed record GoogleIdentity(string Audience, string Email, bool EmailVerified,
         string? Name);
 
