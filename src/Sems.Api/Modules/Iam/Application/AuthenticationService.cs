@@ -57,7 +57,7 @@ public sealed class AuthenticationService
             configuration["Security:RequireVerification"]
             ?? Environment.GetEnvironmentVariable("REQUIRE_VERIFICATION"),
             "true", StringComparison.OrdinalIgnoreCase);
-        _seedDemoData = Sems.Api.Shared.Persistence.SystemDataSeeder.DemoDataEnabled(configuration);
+        _seedDemoData = !string.Equals(configuration["Seeding:DemoData"], "false", StringComparison.OrdinalIgnoreCase);
         _devices = devices;
         _energy = energy;
         _organizations = organizations;
@@ -139,7 +139,8 @@ public sealed class AuthenticationService
         var realNames = new[] { "Luces Pasadizo", "Refrigerador Principal", "Aire Acondicionado Sala", "Horno Industrial", "Servidor Rack 1", "TV Recepción", "Letrero Luminoso", "Cargador Coche Eléctrico", "Bomba de Agua" };
         var randomStatuses = new[] { "ACTIVE", "ACTIVE", "ACTIVE", "INACTIVE", "INACTIVE", "MAINTENANCE" };
 
-        for (int i = 1; i <= 9; i++)
+        int deviceCount = random.Next(4, 10); // Between 4 and 9 devices at random
+        for (int i = 1; i <= deviceCount; i++)
         {
             var deviceType = types[random.Next(types.Length)];
             var brand = brands[random.Next(brands.Length)];
