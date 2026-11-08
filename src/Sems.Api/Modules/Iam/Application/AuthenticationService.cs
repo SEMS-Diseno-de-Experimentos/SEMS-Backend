@@ -119,8 +119,12 @@ public sealed class AuthenticationService
 
         // 1. Create a default Organization and Site for this user
         var taxId = "20" + random.Next(100000000, 999999999).ToString();
-        var (org, _) = await _organizations.RegisterAsync("Mi Hogar / Empresa", "Principal", taxId, "OTHER", userId, ct);
-        var site = await _organizations.RegisterSiteAsync(org.OrganizationId, "SITE-01", "Sede Principal", "Av. Siempre Viva 123", "Lima", 120, 10, "BT5B", false, ct);
+        // La organizacion y el local de demostracion llevan nombres del dominio
+        // comercial. Antes se llamaban "Mi Hogar / Empresa" y "Av. Siempre Viva
+        // 123": restos del segmento residencial anterior, y "hogar" es
+        // precisamente uno de los terminos que el lenguaje ubicuo descarta.
+        var (org, _) = await _organizations.RegisterAsync("Cadena de Demostracion", "Principal", taxId, "SUPERMARKET", userId, ct);
+        var site = await _organizations.RegisterSiteAsync(org.OrganizationId, "SITE-01", "Sede Principal", "Av. Javier Prado Este 1234", "Lima", 120, 10, "BT5B", false, ct);
 
         // 2. Create a default Energy Meter
         var meter = await _energy.RegisterMeterAsync(
