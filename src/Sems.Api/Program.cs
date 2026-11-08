@@ -203,7 +203,7 @@ builder.Services.AddScoped<IDomainEventHandler<DomainEvents.ReadingProcessed>, I
 // backend esta caido.
 var allowedOrigins = (builder.Configuration["AllowedOrigins"]
                       ?? Environment.GetEnvironmentVariable("ALLOWED_ORIGINS")
-                      ?? "https://sems-web-application.vercel.app,https://sems-diseno-web.vercel.app,http://localhost:5173")
+                      ?? "https://sems-web-application.vercel.app,https://sems-diseno-web.vercel.app,http://localhost:5173,http://localhost:5000")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 // Solo los origenes de la lista. Aceptar cualquiera junto con AllowCredentials
