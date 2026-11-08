@@ -134,7 +134,6 @@ builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
 builder.Services.AddSingleton<SubscriptionManager>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<PlanSeeder>();
-builder.Services.AddScoped<SystemDataSeeder>();
 
 // Organizaciones: la empresa, sus locales, las zonas de cada local y quien
 // tiene acceso a que. Es el nivel que sustituye a la vivienda del segmento
@@ -429,7 +428,6 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     try
     {
         await services.GetRequiredService<PlanSeeder>().SeedAsync();
-        await services.GetRequiredService<SystemDataSeeder>().SeedAsync();
     }
     catch (Exception ex)
     {

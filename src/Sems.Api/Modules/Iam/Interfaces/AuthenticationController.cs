@@ -20,23 +20,24 @@ public sealed class AuthenticationController : ControllerBase
 {
     private readonly AuthenticationService _authentication;
     private readonly AccountRecoveryService _recovery;
-    private readonly Sems.Api.Shared.Persistence.SystemDataSeeder _seeder;
 
     public AuthenticationController(AuthenticationService authentication,
-        AccountRecoveryService recovery, Sems.Api.Shared.Persistence.SystemDataSeeder seeder)
+        AccountRecoveryService recovery)
     {
         _authentication = authentication;
         _recovery = recovery;
-        _seeder = seeder;
     }
 
     /// <summary>Creates a new account.</summary>
     [HttpPost("register")]
     public async Task<LoginResponse> Register([FromBody] RegisterRequest request)
     {
+        // El sembrado de demostracion lo decide AuthenticationService, que es
+        // quien conoce el identificador de la cuenta recien creada. Aqui habia
+        // una segunda llamada a un sembrador de SQL crudo cuyas tablas no
+        // existen: fallaba siempre y su excepcion se descartaba en silencio.
         var result = await _authentication.RegisterAsync(request.EmailAddress, request.Password,
             request.Role, request.FullName, request.Segment);
-        try { await _seeder.SeedForUserAsync(request.EmailAddress); } catch { /* ignore seeding errors */ }
         return LoginResponse.From(result);
     }
 
