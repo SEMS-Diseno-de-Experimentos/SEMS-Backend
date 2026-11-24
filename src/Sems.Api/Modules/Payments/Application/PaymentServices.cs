@@ -237,6 +237,11 @@ public sealed class PaymentQueryService
     public Task<List<PaymentMethodEntity>> MethodsByUserAsync(Guid userId,
         CancellationToken ct = default) => _methods.FindByUserIdAsync(userId, ct);
 
+    public async Task<PaymentMethodEntity> MethodByIdAsync(Guid paymentMethodId,
+        CancellationToken ct = default) =>
+        await _methods.FindByIdAsync(paymentMethodId, ct)
+        ?? throw AppException.NotFound("payment method not found");
+
     public async Task<Invoice> InvoiceByIdAsync(Guid invoiceId, CancellationToken ct = default) =>
         await _invoices.FindByIdAsync(invoiceId, ct) ?? throw AppException.NotFound("invoice not found");
 

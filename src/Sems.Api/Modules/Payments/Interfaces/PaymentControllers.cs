@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Payments.Application;
 using Sems.Api.Shared.Http;
+using Sems.Api.Shared.Security;
 using static Sems.Api.Modules.Payments.Interfaces.PaymentResources;
 
 namespace Sems.Api.Modules.Payments.Interfaces;
@@ -63,15 +64,31 @@ public sealed class PaymentController : ControllerBase
         .Select(PaymentResponse.From).ToList();
 
     /// <summary>Payments of a subscription.</summary>
+    /// <remarks>
+    /// De quien es la suscripcion lo sabe el modulo de suscripciones, pero no
+    /// hace falta preguntarselo: cada cobro guarda a quien se le hizo, asi que
+    /// la respuesta se comprueba contra si misma.
+    /// </remarks>
     [HttpGet("subscription/{subscriptionId:guid}")]
-    public async Task<List<PaymentResponse>> BySubscription(Guid subscriptionId) =>
-        (await _queries.PaymentsBySubscriptionAsync(subscriptionId))
-        .Select(PaymentResponse.From).ToList();
+    public async Task<List<PaymentResponse>> BySubscription(Guid subscriptionId)
+    {
+        var cobros = await _queries.PaymentsBySubscriptionAsync(subscriptionId);
+        var llamante = User.CallerId();
+        foreach (var cobro in cobros)
+        {
+            AccessGuards.MustOwn(llamante, cobro.UserId);
+        }
+        return cobros.Select(PaymentResponse.From).ToList();
+    }
 
     /// <summary>Gets a payment by its identifier.</summary>
     [HttpGet("{paymentId:guid}")]
-    public async Task<PaymentResponse> ById(Guid paymentId) =>
-        PaymentResponse.From(await _queries.PaymentByIdAsync(paymentId));
+    public async Task<PaymentResponse> ById(Guid paymentId)
+    {
+        var cobro = await _queries.PaymentByIdAsync(paymentId);
+        AccessGuards.MustOwn(User.CallerId(), cobro.UserId);
+        return PaymentResponse.From(cobro);
+    }
 }
 
 /// <summary>Payment methods saved by the user.</summary>
@@ -107,16 +124,26 @@ public sealed class PaymentMethodController : ControllerBase
 
     /// <summary>Marks a payment method as the default one.</summary>
     [HttpPut("{paymentMethodId:guid}/default")]
-    public async Task<PaymentMethodResponse> SetDefault(Guid paymentMethodId) =>
-        PaymentMethodResponse.From(await _commands.SetDefaultAsync(paymentMethodId));
+    public async Task<PaymentMethodResponse> SetDefault(Guid paymentMethodId)
+    {
+        await DebeSerSuyoAsync(paymentMethodId);
+        return PaymentMethodResponse.From(await _commands.SetDefaultAsync(paymentMethodId));
+    }
 
     /// <summary>Deletes a payment method.</summary>
     [HttpDelete("{paymentMethodId:guid}")]
     public async Task<IActionResult> Delete(Guid paymentMethodId)
     {
+        // Borrar la tarjeta de otro no le da acceso a nada, pero le deja la
+        // cuenta sin forma de pagar la siguiente factura.
+        await DebeSerSuyoAsync(paymentMethodId);
         await _commands.DeleteAsync(paymentMethodId);
         return NoContent();
     }
+
+    private async Task DebeSerSuyoAsync(Guid paymentMethodId) =>
+        AccessGuards.MustOwn(User.CallerId(),
+            (await _queries.MethodByIdAsync(paymentMethodId)).UserId);
 }
 
 /// <summary>Invoices issued for each completed charge.</summary>
@@ -130,14 +157,29 @@ public sealed class InvoiceController : ControllerBase
     public InvoiceController(PaymentQueryService queries) => _queries = queries;
 
     /// <summary>Gets an invoice by its identifier.</summary>
+    /// <remarks>
+    /// La factura no guarda al usuario: guarda el cobro, y el cobro si. Por eso
+    /// la propiedad se resuelve a traves de el.
+    /// </remarks>
     [HttpGet("{invoiceId:guid}")]
-    public async Task<InvoiceResponse> ById(Guid invoiceId) =>
-        InvoiceResponse.From(await _queries.InvoiceByIdAsync(invoiceId));
+    public async Task<InvoiceResponse> ById(Guid invoiceId)
+    {
+        var factura = await _queries.InvoiceByIdAsync(invoiceId);
+        await DebeSerDelCobroAsync(factura.PaymentId);
+        return InvoiceResponse.From(factura);
+    }
 
     /// <summary>Invoice associated with a payment.</summary>
     [HttpGet("payment/{paymentId:guid}")]
-    public async Task<InvoiceResponse> ByPayment(Guid paymentId) =>
-        InvoiceResponse.From(await _queries.InvoiceByPaymentAsync(paymentId));
+    public async Task<InvoiceResponse> ByPayment(Guid paymentId)
+    {
+        await DebeSerDelCobroAsync(paymentId);
+        return InvoiceResponse.From(await _queries.InvoiceByPaymentAsync(paymentId));
+    }
+
+    private async Task DebeSerDelCobroAsync(Guid paymentId) =>
+        AccessGuards.MustOwn(User.CallerId(),
+            (await _queries.PaymentByIdAsync(paymentId)).UserId);
 }
 
 /// <summary>
