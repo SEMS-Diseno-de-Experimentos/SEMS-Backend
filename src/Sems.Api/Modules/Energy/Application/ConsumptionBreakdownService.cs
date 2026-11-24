@@ -85,7 +85,7 @@ public sealed class ConsumptionBreakdownService
             .ToDictionary(g => g.Key, g => g.Count());
         var medidoresSinZona = medidores.Count(m => m.ZoneId is null);
 
-        var tarifa = TarifaDe(local.TariffCategory);
+        var tarifa = _pricing.TariffOrNull(local.TariffCategory);
         var totalKwh = porZona.Values.Sum(a => a.Kwh) + sinZona.Kwh;
 
         var zonas = new List<ZoneShare>();
@@ -127,7 +127,7 @@ public sealed class ConsumptionBreakdownService
                 consumo.Suma(lectura, local.ExcludesSundaysFromPeak);
             }
 
-            var tarifa = TarifaDe(local.TariffCategory);
+            var tarifa = _pricing.TariffOrNull(local.TariffCategory);
             moneda ??= Moneda(tarifa);
             total += consumo.Kwh;
 
@@ -188,24 +188,6 @@ public sealed class ConsumptionBreakdownService
     private int Dias(int days) => days <= 0 ? DiasPorDefecto : Math.Min(days, DiasMaximo);
 
     private DateTime Desde(int days) => DateTime.UtcNow.AddDays(-Dias(days));
-
-    private CommercialTariff? TarifaDe(string? categoria)
-    {
-        if (string.IsNullOrWhiteSpace(categoria))
-        {
-            return null;
-        }
-        try
-        {
-            return _pricing.CurrentTariff(categoria);
-        }
-        catch (Exception)
-        {
-            // Un local sin tarifa reconocida sigue teniendo consumo que mostrar;
-            // lo que no se puede es ponerle precio.
-            return null;
-        }
-    }
 
     private string Moneda(CommercialTariff? tarifa) => tarifa?.Currency ?? "PEN";
 
