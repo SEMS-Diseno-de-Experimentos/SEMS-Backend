@@ -38,9 +38,13 @@ public sealed class JwtTokenService : ITokenService
 
     public JwtTokenService(IConfiguration configuration)
     {
+        // Misma exigencia que al arrancar: no hay clave por defecto. Esta era la
+        // segunda copia de aquel valor fijo, y es la que firma de verdad; dejarla
+        // habria bastado para seguir emitiendo tokens con una clave publicada.
         _secret = configuration["Security:Jwt:Secret"]
                   ?? Environment.GetEnvironmentVariable("JWT_SECRET")
-                  ?? "replace_with_minimum_32_chars_secret_key_for_hs256";
+                  ?? throw new InvalidOperationException(
+                      "JWT_SECRET no esta configurada: no se pueden firmar sesiones.");
         _expirationMinutes = int.TryParse(configuration["Security:Jwt:ExpirationMinutes"]
                                           ?? Environment.GetEnvironmentVariable("JWT_EXPIRATION_MINUTES"),
             out var m) ? m : 120;

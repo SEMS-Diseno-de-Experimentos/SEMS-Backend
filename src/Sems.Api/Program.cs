@@ -134,7 +134,6 @@ builder.Services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
 builder.Services.AddSingleton<SubscriptionManager>();
 builder.Services.AddScoped<SubscriptionService>();
 builder.Services.AddScoped<PlanSeeder>();
-builder.Services.AddScoped<SystemDataSeeder>();
 
 // Organizaciones: la empresa, sus locales, las zonas de cada local y quien
 // tiene acceso a que. Es el nivel que sustituye a la vivienda del segmento
@@ -282,8 +281,26 @@ builder.Services.AddSwaggerGen(options =>
 
 // ------------------------------------------------------------------ seguridad
 var jwtSecret = builder.Configuration["Security:Jwt:Secret"]
-                ?? Environment.GetEnvironmentVariable("JWT_SECRET")
-                ?? "replace_with_minimum_32_chars_secret_key_for_hs256";
+                ?? Environment.GetEnvironmentVariable("JWT_SECRET");
+
+// Sin clave no se arranca, y con una corta tampoco.
+//
+// Antes habia un valor por defecto escrito aqui mismo. Como este repositorio es
+// publico, cualquiera podia leerlo y fabricarse un token valido para el usuario
+// que quisiera, y un despliegue al que se le olvidara la variable no daba ni un
+// aviso: arrancaba, respondia Healthy y firmaba con esa clave conocida. Fallar
+// al arrancar es ruidoso a proposito: el error sale en el primer log y se
+// arregla poniendo la variable, que es justo lo que faltaba.
+//
+// HS256 exige 256 bits de clave, que son los 32 caracteres del minimo.
+if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
+{
+    throw new InvalidOperationException(
+        "JWT_SECRET no esta configurada o tiene menos de 32 caracteres. "
+        + "Es la clave con la que se firman las sesiones: sin ella la API no puede arrancar. "
+        + "Generar una aleatoria (por ejemplo 'openssl rand -base64 48') y ponerla en la "
+        + "variable de entorno JWT_SECRET o en la clave de configuracion Security:Jwt:Secret.");
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -429,7 +446,6 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     try
     {
         await services.GetRequiredService<PlanSeeder>().SeedAsync();
-        await services.GetRequiredService<SystemDataSeeder>().SeedAsync();
     }
     catch (Exception ex)
     {

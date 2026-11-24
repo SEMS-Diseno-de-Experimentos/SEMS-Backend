@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Sems.Api.Modules.Iam.Application;
-using Sems.Api.Shared.Errors;
-using Sems.Api.Shared.Persistence;
 using static Sems.Api.Modules.Iam.Interfaces.AuthResources;
 
 namespace Sems.Api.Modules.Iam.Interfaces;
@@ -19,59 +16,23 @@ public sealed class AuthenticationController : ControllerBase
 {
     private readonly AuthenticationService _authentication;
     private readonly AccountRecoveryService _recovery;
-    private readonly SystemDataSeeder _seeder;
-    private readonly SemsDbContext _context;
-
     public AuthenticationController(AuthenticationService authentication,
-        AccountRecoveryService recovery, SystemDataSeeder seeder, SemsDbContext context)
+        AccountRecoveryService recovery)
     {
         _authentication = authentication;
         _recovery = recovery;
-        _seeder = seeder;
-        _context = context;
-    }
-
-    private async Task CleanupUserInternalAsync(string email)
-    {
-        var normalized = email.Trim().ToLowerInvariant();
-        try
-        {
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM dm_device_events WHERE device_id IN (SELECT id FROM dm_devices WHERE user_id IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized}))");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM dm_device_configurations WHERE device_id IN (SELECT id FROM dm_devices WHERE user_id IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized}))");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM dm_device_bindings WHERE device_id IN (SELECT id FROM dm_devices WHERE user_id IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized}))");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM dm_devices WHERE user_id IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM em_energy_readings WHERE user_id = {normalized} OR user_id IN (SELECT \"UserId\"::text FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM em_alerts WHERE user_id = {normalized} OR user_id IN (SELECT \"UserId\"::text FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM em_meters WHERE user_id = {normalized} OR user_id IN (SELECT \"UserId\"::text FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM al_alerts WHERE user_id IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM org_memberships WHERE user_id IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM sb_subscriptions WHERE \"UserId\" IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM iam_refresh_tokens WHERE \"UserId\" IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM iam_user_auth_tokens WHERE \"UserId\" IN (SELECT \"UserId\" FROM iam_users WHERE \"EmailAddress\" = {normalized})");
-            await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM iam_users WHERE \"EmailAddress\" = {normalized}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Cleanup error for {normalized}: {ex.Message}");
-        }
-    }
-
-    /// <summary>Deletes user and all related demo data (for testing/reset).</summary>
-    [HttpDelete("test-cleanup")]
-    public async Task<IActionResult> TestCleanup([FromQuery] string email)
-    {
-        if (string.IsNullOrWhiteSpace(email)) return BadRequest("email is required");
-        await CleanupUserInternalAsync(email);
-        return Ok(new { message = $"Usuario {email} limpiado correctamente." });
     }
 
     /// <summary>Creates a new account.</summary>
     [HttpPost("register")]
     public async Task<LoginResponse> Register([FromBody] RegisterRequest request)
     {
+        // El sembrado de demostracion lo decide AuthenticationService, que es
+        // quien conoce el identificador de la cuenta recien creada. Aqui habia
+        // una segunda llamada a un sembrador de SQL crudo cuyas tablas no
+        // existen: fallaba siempre y su excepcion se descartaba en silencio.
         var result = await _authentication.RegisterAsync(request.EmailAddress, request.Password,
             request.Role, request.FullName, request.Segment);
-        try { await _seeder.SeedForUserAsync(request.EmailAddress); } catch { /* ignore seeding errors */ }
         return LoginResponse.From(result);
     }
 
