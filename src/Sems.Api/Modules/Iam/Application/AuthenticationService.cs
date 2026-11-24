@@ -57,7 +57,13 @@ public sealed class AuthenticationService
             configuration["Security:RequireVerification"]
             ?? Environment.GetEnvironmentVariable("REQUIRE_VERIFICATION"),
             "true", StringComparison.OrdinalIgnoreCase);
-        _seedDemoData = !string.Equals(configuration["Seeding:DemoData"], "false", StringComparison.OrdinalIgnoreCase);
+        // Una sola regla para el interruptor, la de SystemDataSeeder: hay que
+        // pedir los datos de demostracion. Aqui habia una regla opuesta —todo
+        // encendido salvo un "false" exacto— sobre la misma clave, y ademas
+        // dejaba de mirar la variable de entorno SEED_DEMO_DATA. El efecto era
+        // que cada cuenta real nacia con una organizacion inventada cuyo local
+        // agotaba el unico cupo del plan de entrada.
+        _seedDemoData = Sems.Api.Shared.Persistence.SystemDataSeeder.DemoDataEnabled(configuration);
         _devices = devices;
         _energy = energy;
         _organizations = organizations;
