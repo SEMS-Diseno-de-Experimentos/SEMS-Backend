@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Energy.Application;
 using Sems.Api.Modules.Energy.Domain.Model;
+using Sems.Api.Shared.Http;
 using static Sems.Api.Modules.Energy.Interfaces.EnergyResources;
 
 namespace Sems.Api.Modules.Energy.Interfaces;
@@ -24,6 +25,7 @@ public sealed class EnergyMeterController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<MeterResponse>> Register([FromBody] RegisterMeterRequest request)
     {
+        User.MustBeSelf(request.UserId);
         var meter = await _commands.RegisterMeterAsync(request.UserId, request.SiteId,
             request.ZoneId, request.MeterSerial, request.Model, request.Brand, request.Location,
             request.FirmwareVersion, request.MaxPowerWatts);
@@ -31,9 +33,17 @@ public sealed class EnergyMeterController : ControllerBase
     }
 
     /// <summary>Lists a user's meters.</summary>
+    /// <remarks>
+    /// El identificador se comprueba contra el token pero se sigue pasando tal
+    /// como llego: en este modulo el usuario se guarda como texto, y
+    /// normalizarlo ahora dejaria de encontrar las filas escritas antes.
+    /// </remarks>
     [HttpGet("user/{userId}")]
-    public async Task<List<MeterResponse>> ByUser(string userId) =>
-        (await _queries.MetersByUserAsync(userId)).Select(MeterResponse.From).ToList();
+    public async Task<List<MeterResponse>> ByUser(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _queries.MetersByUserAsync(userId)).Select(MeterResponse.From).ToList();
+    }
 
     /// <summary>Lists the meters installed in a site.</summary>
     [HttpGet("site/{siteId:guid}")]
@@ -81,6 +91,10 @@ public sealed class EnergyReadingController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ReadingResponse>> Create([FromBody] CreateReadingRequest request)
     {
+        // El medidor fisico publica con el token de su usuario, asi que una
+        // lectura a nombre de otro solo puede venir de un cliente que se la
+        // inventa.
+        User.MustBeSelf(request.UserId);
         var reading = await _commands.RecordReadingAsync(request.UserId, request.MeterId,
             request.DeviceId, request.PowerWatts, request.Voltage, request.Current,
             request.Frequency, request.EnergyKwh, request.Timestamp, request.ReadingType,
@@ -91,8 +105,12 @@ public sealed class EnergyReadingController : ControllerBase
     /// <summary>A user's readings, newest first.</summary>
     [HttpGet("user/{userId}")]
     public async Task<List<ReadingResponse>> ByUser(string userId,
-        [FromQuery] int limit = 100) =>
-        Lecturas.Valorizadas(await _queries.WithCostAsync(await _queries.ReadingsByUserAsync(userId, limit)));
+        [FromQuery] int limit = 100)
+    {
+        User.MustBeSelf(userId);
+        return Lecturas.Valorizadas(
+            await _queries.WithCostAsync(await _queries.ReadingsByUserAsync(userId, limit)));
+    }
 
     /// <summary>Readings from a device.</summary>
     [HttpGet("device/{deviceId}")]
@@ -102,11 +120,18 @@ public sealed class EnergyReadingController : ControllerBase
             await _queries.ReadingsByDeviceAsync(deviceId, limit, skip)));
 
     /// <summary>A user's readings within a date range.</summary>
+    /// <remarks>
+    /// Aqui el usuario llega en la cadena de consulta y no en la ruta, que es
+    /// justo lo que lo hacia facil de pasar por alto.
+    /// </remarks>
     [HttpGet("range")]
     public async Task<List<ReadingResponse>> ByRange([FromQuery] string userId,
-        [FromQuery] DateTime from, [FromQuery] DateTime to) =>
-        Lecturas.Valorizadas(await _queries.WithCostAsync(
+        [FromQuery] DateTime from, [FromQuery] DateTime to)
+    {
+        User.MustBeSelf(userId);
+        return Lecturas.Valorizadas(await _queries.WithCostAsync(
             await _queries.ReadingsByRangeAsync(userId, from, to)));
+    }
 
     /// <summary>Latest reading from a meter.</summary>
     [HttpGet("meter/{meterId}/latest")]
@@ -181,15 +206,22 @@ public sealed class DeviceConsumptionController : ControllerBase
 
     /// <summary>A user's consumption summaries.</summary>
     [HttpGet("user/{userId}")]
-    public async Task<List<ConsumptionResponse>> ByUser(string userId) =>
-        (await _queries.ConsumptionsByUserAsync(userId)).Select(ConsumptionResponse.From).ToList();
+    public async Task<List<ConsumptionResponse>> ByUser(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _queries.ConsumptionsByUserAsync(userId))
+            .Select(ConsumptionResponse.From).ToList();
+    }
 
     /// <summary>A user's highest-consuming devices.</summary>
     [HttpGet("user/{userId}/top")]
     public async Task<List<ConsumptionResponse>> TopByUser(string userId,
-        [FromQuery] int limit = 10) =>
-        (await _queries.TopConsumersByUserAsync(userId, limit))
-        .Select(ConsumptionResponse.From).ToList();
+        [FromQuery] int limit = 10)
+    {
+        User.MustBeSelf(userId);
+        return (await _queries.TopConsumersByUserAsync(userId, limit))
+            .Select(ConsumptionResponse.From).ToList();
+    }
 
     /// <summary>Gets a summary by its identifier.</summary>
     [HttpGet("{consumptionId:guid}")]
@@ -214,13 +246,20 @@ public sealed class ConsumptionAlertController : ControllerBase
 
     /// <summary>Alerts for a user.</summary>
     [HttpGet("user/{userId}")]
-    public async Task<List<AlertResponse>> ByUser(string userId) =>
-        (await _queries.AlertsByUserAsync(userId)).Select(AlertResponse.From).ToList();
+    public async Task<List<AlertResponse>> ByUser(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _queries.AlertsByUserAsync(userId)).Select(AlertResponse.From).ToList();
+    }
 
     /// <summary>Unread alerts for a user.</summary>
     [HttpGet("user/{userId}/unread")]
-    public async Task<List<AlertResponse>> UnreadByUser(string userId) =>
-        (await _queries.UnreadAlertsByUserAsync(userId)).Select(AlertResponse.From).ToList();
+    public async Task<List<AlertResponse>> UnreadByUser(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _queries.UnreadAlertsByUserAsync(userId))
+            .Select(AlertResponse.From).ToList();
+    }
 
     /// <summary>Gets an alert by its identifier.</summary>
     [HttpGet("{alertId:guid}")]
@@ -254,12 +293,18 @@ public sealed class UserGoalController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<GoalResponse> GetGoal(string userId) =>
-        GoalResponse.From(await _queries.GoalByUserAsync(userId));
+    public async Task<GoalResponse> GetGoal(string userId)
+    {
+        User.MustBeSelf(userId);
+        return GoalResponse.From(await _queries.GoalByUserAsync(userId));
+    }
 
     [HttpPut]
-    public async Task<GoalResponse> SetGoal(string userId, [FromBody] SetGoalRequest request) =>
-        GoalResponse.From(await _commands.SetUserGoalAsync(userId, request.MonthlyGoalKwh));
+    public async Task<GoalResponse> SetGoal(string userId, [FromBody] SetGoalRequest request)
+    {
+        User.MustBeSelf(userId);
+        return GoalResponse.From(await _commands.SetUserGoalAsync(userId, request.MonthlyGoalKwh));
+    }
 }
 
 /// <summary>
