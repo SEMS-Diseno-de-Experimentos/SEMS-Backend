@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Alerts.Application;
 using Sems.Api.Shared.Http;
+using Sems.Api.Shared.Security;
 using static Sems.Api.Modules.Alerts.Interfaces.AlertResources;
 
 namespace Sems.Api.Modules.Alerts.Interfaces;
@@ -17,11 +18,14 @@ public sealed class AlertController : ControllerBase
 {
     private readonly AlertCommandService _commands;
     private readonly AlertQueryService _queries;
+    private readonly IAccessPolicy _access;
 
-    public AlertController(AlertCommandService commands, AlertQueryService queries)
+    public AlertController(AlertCommandService commands, AlertQueryService queries,
+        IAccessPolicy access)
     {
         _commands = commands;
         _queries = queries;
+        _access = access;
     }
 
     // ------------------------------------------------------------------ alertas
@@ -48,15 +52,30 @@ public sealed class AlertController : ControllerBase
         (await _queries.AlertsByUserAsync(User.CallerId())).Select(AlertResponse.From).ToList();
 
     /// <summary>Gets an alert by its identifier.</summary>
+    /// <remarks>
+    /// Las de demanda llevan el local al que se refieren, y esas si las tiene
+    /// que poder ver quien supervisa ese local aunque el aviso se generara a
+    /// nombre de otra persona.
+    /// </remarks>
     [HttpGet("alerts/{id:guid}")]
-    public async Task<AlertResponse> ById(Guid id) =>
-        AlertResponse.From(await _queries.AlertByIdAsync(id));
+    public async Task<AlertResponse> ById(Guid id)
+    {
+        var aviso = await _queries.AlertByIdAsync(id);
+        await _access.MustOwnOrReachSiteAsync(User.CallerId(), aviso.UserId,
+            aviso.SiteId ?? Guid.Empty);
+        return AlertResponse.From(aviso);
+    }
 
     /// <summary>Changes the status of an alert.</summary>
     [HttpPatch("alerts/{id:guid}/status")]
     public async Task<AlertResponse> UpdateStatus(Guid id,
-        [FromBody] UpdateAlertStatusRequest r) =>
-        AlertResponse.From(await _commands.UpdateStatusAsync(id, r.Status, r.ResolvedAt));
+        [FromBody] UpdateAlertStatusRequest r)
+    {
+        var aviso = await _queries.AlertByIdAsync(id);
+        await _access.MustOwnOrReachSiteAsync(User.CallerId(), aviso.UserId,
+            aviso.SiteId ?? Guid.Empty);
+        return AlertResponse.From(await _commands.UpdateStatusAsync(id, r.Status, r.ResolvedAt));
+    }
 
     /// <summary>Alerts for a user.</summary>
     [HttpGet("users/{userId:guid}/alerts")]
@@ -134,8 +153,12 @@ public sealed class AlertController : ControllerBase
 
     /// <summary>Active demand rules for a site.</summary>
     [HttpGet("sites/{siteId:guid}/demand-rules")]
-    public async Task<List<DemandRuleResponse>> DemandRulesBySite(Guid siteId) =>
-        (await _commands.DemandRulesBySiteAsync(siteId)).Select(DemandRuleResponse.From).ToList();
+    public async Task<List<DemandRuleResponse>> DemandRulesBySite(Guid siteId)
+    {
+        await _access.MustReachSiteAsync(User.CallerId(), siteId);
+        return (await _commands.DemandRulesBySiteAsync(siteId))
+            .Select(DemandRuleResponse.From).ToList();
+    }
 
     /// <summary>
     /// Evaluates a measured demand against the site rules and raises the
@@ -143,9 +166,14 @@ public sealed class AlertController : ControllerBase
     /// </summary>
     [HttpPost("sites/{siteId:guid}/demand-evaluations")]
     public async Task<List<AlertResponse>> EvaluateDemand(Guid siteId,
-        [FromBody] EvaluateDemandRequest request) =>
-        (await _commands.EvaluateDemandAsync(siteId, request.DemandKw))
+        [FromBody] EvaluateDemandRequest request)
+    {
+        // Levanta avisos en el local, asi que quien no lo alcanza tampoco
+        // puede llenarlo de alarmas inventadas.
+        await _access.MustReachSiteAsync(User.CallerId(), siteId);
+        return (await _commands.EvaluateDemandAsync(siteId, request.DemandKw))
             .Select(AlertResponse.From).ToList();
+    }
 
     private static Guid? OptionalGuid(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : Guid.Parse(value);
