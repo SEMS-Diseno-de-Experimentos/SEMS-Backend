@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Subscriptions.Application;
 using Sems.Api.Shared.Http;
+using Sems.Api.Shared.Security;
 using static Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionResources;
 
 namespace Sems.Api.Modules.Subscriptions.Interfaces;
@@ -47,9 +48,17 @@ public sealed class SubscriptionController : ControllerBase
     }
 
     /// <summary>Gets a subscription by its identifier.</summary>
+    /// <remarks>
+    /// La suscripcion es de una persona y no de un local, asi que aqui no hay
+    /// membresia a la que recurrir: o es suya, o no la ve.
+    /// </remarks>
     [HttpGet("subscriptions/{subscriptionId:guid}")]
-    public async Task<SubscriptionResource> ById(Guid subscriptionId) =>
-        SubscriptionResource.From(await _service.SubscriptionByIdAsync(subscriptionId));
+    public async Task<SubscriptionResource> ById(Guid subscriptionId)
+    {
+        var suscripcion = await _service.SubscriptionByIdAsync(subscriptionId);
+        AccessGuards.MustOwn(User.CallerId(), suscripcion.UserId);
+        return SubscriptionResource.From(suscripcion);
+    }
 
     /// <summary>Creates a subscription.</summary>
     [HttpPost("subscriptions")]
@@ -64,13 +73,32 @@ public sealed class SubscriptionController : ControllerBase
 
     /// <summary>Cancels a subscription.</summary>
     [HttpPatch("subscriptions/{subscriptionId:guid}/cancel")]
-    public async Task<SubscriptionResource> Cancel(Guid subscriptionId) =>
-        SubscriptionResource.From(await _service.CancelAsync(subscriptionId));
+    public async Task<SubscriptionResource> Cancel(Guid subscriptionId)
+    {
+        await DebeSerSuyaAsync(subscriptionId);
+        return SubscriptionResource.From(await _service.CancelAsync(subscriptionId));
+    }
 
     /// <summary>Changes the plan of a subscription.</summary>
     [HttpPatch("subscriptions/{subscriptionId:guid}/change-plan")]
     public async Task<SubscriptionResource> ChangePlan(Guid subscriptionId,
-        [FromBody] ChangePlanRequest request) =>
-        SubscriptionResource.From(
+        [FromBody] ChangePlanRequest request)
+    {
+        await DebeSerSuyaAsync(subscriptionId);
+        return SubscriptionResource.From(
             await _service.ChangePlanAsync(subscriptionId, Guid.Parse(request.NewPlanId)));
+    }
+
+    /// <summary>
+    /// Comprueba la propiedad antes de escribir.
+    /// </summary>
+    /// <remarks>
+    /// Cuesta una lectura de mas: el servicio volvera a cargar la suscripcion
+    /// para modificarla. Es el precio de dejar la capa de aplicacion intacta,
+    /// que es la que usan el sembrador y los manejadores de eventos, que no
+    /// actuan en nombre de nadie y no tienen token que comprobar.
+    /// </remarks>
+    private async Task DebeSerSuyaAsync(Guid subscriptionId) =>
+        AccessGuards.MustOwn(User.CallerId(),
+            (await _service.SubscriptionByIdAsync(subscriptionId)).UserId);
 }
