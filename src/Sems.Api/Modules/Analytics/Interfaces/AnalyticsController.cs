@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Analytics.Application;
+using Sems.Api.Shared.Http;
 using Sems.Api.Modules.Analytics.Domain.Model;
 using static Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources;
 
@@ -30,14 +31,19 @@ public sealed class AnalyticsController : ControllerBase
 
     /// <summary>A user's bill forecasts.</summary>
     [HttpGet("bill-predictions/user/{userId}")]
-    public async Task<List<BillPredictionResponse>> Predictions(string userId) =>
-        (await _service.PredictionsByUserAsync(userId)).Select(BillPredictionResponse.From).ToList();
+    public async Task<List<BillPredictionResponse>> Predictions(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _service.PredictionsByUserAsync(userId))
+            .Select(BillPredictionResponse.From).ToList();
+    }
 
     /// <summary>Records a bill forecast.</summary>
     [HttpPost("bill-predictions")]
     public async Task<ActionResult<BillPredictionResponse>> CreatePrediction(
         [FromBody] CreatePredictionRequest r)
     {
+        User.MustBeSelf(r.UserId);
         var created = await _service.CreatePredictionAsync(r.UserId, r.PredictionYear,
             r.PredictionMonth, r.PeriodStart, r.PeriodEnd, r.EstimatedKwh, r.EstimatedAmount,
             r.Currency, r.TariffUsed, r.ErrorMarginPercentage);
@@ -52,6 +58,7 @@ public sealed class AnalyticsController : ControllerBase
     public async Task<ActionResult<BillPredictionResponse>> ForecastSiteBill(
         [FromBody] ForecastSiteBillRequest r)
     {
+        User.MustBeSelf(r.UserId);
         var created = await _service.ForecastSiteBillAsync(r.UserId, r.SiteId, r.TariffCategory,
             r.ContractedPowerKw, r.PredictionYear, r.PredictionMonth, r.PeriodStart, r.PeriodEnd,
             r.KwhPeak, r.KwhOffPeak, r.MaxDemandKw, r.ErrorMarginPercentage);
@@ -62,14 +69,19 @@ public sealed class AnalyticsController : ControllerBase
 
     /// <summary>A user's saving recommendations.</summary>
     [HttpGet("recommendations/user/{userId}")]
-    public async Task<List<RecommendationResponse>> Recommendations(string userId) =>
-        (await _service.RecommendationsByUserAsync(userId)).Select(RecommendationResponse.From).ToList();
+    public async Task<List<RecommendationResponse>> Recommendations(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _service.RecommendationsByUserAsync(userId))
+            .Select(RecommendationResponse.From).ToList();
+    }
 
     /// <summary>Records a recommendation.</summary>
     [HttpPost("recommendations")]
     public async Task<ActionResult<RecommendationResponse>> CreateRecommendation(
         [FromBody] CreateRecommendationRequest r)
     {
+        User.MustBeSelf(r.UserId);
         var created = await _service.CreateRecommendationAsync(r.UserId, r.DeviceId,
             r.RecommendationType, r.Title, r.Description, r.EstimatedSavingKwh,
             r.EstimatedSavingAmount, r.Currency);
@@ -85,13 +97,18 @@ public sealed class AnalyticsController : ControllerBase
 
     /// <summary>Anomalies detected for a user.</summary>
     [HttpGet("anomalies/user/{userId}")]
-    public async Task<List<AnomalyResponse>> Anomalies(string userId) =>
-        (await _service.AnomaliesByUserAsync(userId)).Select(AnomalyResponse.From).ToList();
+    public async Task<List<AnomalyResponse>> Anomalies(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _service.AnomaliesByUserAsync(userId))
+            .Select(AnomalyResponse.From).ToList();
+    }
 
     /// <summary>Records an anomaly.</summary>
     [HttpPost("anomalies")]
     public async Task<ActionResult<AnomalyResponse>> CreateAnomaly([FromBody] CreateAnomalyRequest r)
     {
+        User.MustBeSelf(r.UserId);
         var created = await _service.CreateAnomalyAsync(r.UserId, r.DeviceId, r.AnomalyType,
             r.Description, r.Severity, r.ActualKwh, r.ExpectedKwh);
         return StatusCode(StatusCodes.Status201Created, AnomalyResponse.From(created));
@@ -106,15 +123,19 @@ public sealed class AnalyticsController : ControllerBase
 
     /// <summary>Appliance identifications for a user.</summary>
     [HttpGet("device-identifications/user/{userId}")]
-    public async Task<List<DeviceIdentificationResponse>> Identifications(string userId) =>
-        (await _service.IdentificationsByUserAsync(userId))
+    public async Task<List<DeviceIdentificationResponse>> Identifications(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _service.IdentificationsByUserAsync(userId))
         .Select(DeviceIdentificationResponse.From).ToList();
+    }
 
     /// <summary>Records an appliance identification.</summary>
     [HttpPost("device-identifications")]
     public async Task<ActionResult<DeviceIdentificationResponse>> CreateIdentification(
         [FromBody] CreateIdentificationRequest r)
     {
+        User.MustBeSelf(r.UserId);
         var created = await _service.CreateIdentificationAsync(r.UserId, r.DeviceId,
             r.PredictedDeviceType, r.ConfidenceScore, r.Status);
         return StatusCode(StatusCodes.Status201Created, DeviceIdentificationResponse.From(created));
@@ -133,6 +154,7 @@ public sealed class AnalyticsController : ControllerBase
     [HttpPost("insights/recompute")]
     public async Task<InsightsResponse> Recompute([FromBody] RecomputeInsightsRequest r)
     {
+        User.MustBeSelf(r.UserId);
         var hallazgos = await _insights.RecalcularAsync(r.UserId);
         return InsightsResponse.From(hallazgos);
     }
@@ -141,8 +163,12 @@ public sealed class AnalyticsController : ControllerBase
 
     /// <summary>A user's consumption rankings.</summary>
     [HttpGet("consumption-rankings/user/{userId}")]
-    public async Task<List<ConsumptionRankingResponse>> Rankings(string userId) =>
-        (await _service.RankingsByUserAsync(userId)).Select(ConsumptionRankingResponse.From).ToList();
+    public async Task<List<ConsumptionRankingResponse>> Rankings(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _service.RankingsByUserAsync(userId))
+            .Select(ConsumptionRankingResponse.From).ToList();
+    }
 
     /// <summary>Records a consumption ranking.</summary>
     [HttpPost("consumption-rankings")]
@@ -150,6 +176,7 @@ public sealed class AnalyticsController : ControllerBase
         [FromBody] CreateRankingRequest r)
     {
         var items = r.Rankings?.Select(i => i.ToDomain()) ?? Enumerable.Empty<RankingItem>();
+        User.MustBeSelf(r.UserId);
         var created = await _service.CreateRankingAsync(r.UserId, r.PeriodType, r.PeriodStart,
             r.PeriodEnd, items);
         return StatusCode(StatusCodes.Status201Created, ConsumptionRankingResponse.From(created));

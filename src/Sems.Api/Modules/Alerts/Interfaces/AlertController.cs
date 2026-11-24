@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Alerts.Application;
+using Sems.Api.Shared.Http;
 using static Sems.Api.Modules.Alerts.Interfaces.AlertResources;
 
 namespace Sems.Api.Modules.Alerts.Interfaces;
@@ -29,16 +30,22 @@ public sealed class AlertController : ControllerBase
     [HttpPost("alerts")]
     public async Task<ActionResult<AlertResponse>> Create([FromBody] CreateAlertRequest r)
     {
-        var alert = await _commands.CreateAlertAsync(Guid.Parse(r.UserId),
+        var alert = await _commands.CreateAlertAsync(User.MustBeSelf(r.UserId),
             Guid.Parse(r.DeviceId), OptionalGuid(r.ThresholdId), OptionalGuid(r.InactivityRuleId),
             r.AlertType, r.Title, r.Message, r.Severity, r.Status, r.TriggeredAt);
         return StatusCode(StatusCodes.Status201Created, AlertResponse.From(alert));
     }
 
-    /// <summary>Lists every alert.</summary>
+    /// <summary>Lists the caller's alerts.</summary>
+    /// <remarks>
+    /// Antes devolvia las alertas de todos los usuarios, sin ningun filtro. No
+    /// hacia falta adivinar un identificador para leer lo de un tercero:
+    /// bastaba pedir la lista. Ahora la ruta significa "las mias", que es lo
+    /// unico que un endpoint sin identificador puede querer decir.
+    /// </remarks>
     [HttpGet("alerts")]
-    public async Task<List<AlertResponse>> All() =>
-        (await _queries.AllAlertsAsync()).Select(AlertResponse.From).ToList();
+    public async Task<List<AlertResponse>> Mine() =>
+        (await _queries.AlertsByUserAsync(User.CallerId())).Select(AlertResponse.From).ToList();
 
     /// <summary>Gets an alert by its identifier.</summary>
     [HttpGet("alerts/{id:guid}")]
@@ -54,7 +61,8 @@ public sealed class AlertController : ControllerBase
     /// <summary>Alerts for a user.</summary>
     [HttpGet("users/{userId:guid}/alerts")]
     public async Task<List<AlertResponse>> ByUser(Guid userId) =>
-        (await _queries.AlertsByUserAsync(userId)).Select(AlertResponse.From).ToList();
+        (await _queries.AlertsByUserAsync(User.MustBeSelf(userId)))
+        .Select(AlertResponse.From).ToList();
 
     // ----------------------------------------------------------------- umbrales
 
@@ -63,7 +71,7 @@ public sealed class AlertController : ControllerBase
     public async Task<ActionResult<ThresholdResponse>> CreateThreshold(
         [FromBody] CreateThresholdRequest r)
     {
-        var threshold = await _commands.CreateThresholdAsync(Guid.Parse(r.UserId),
+        var threshold = await _commands.CreateThresholdAsync(User.MustBeSelf(r.UserId),
             Guid.Parse(r.DeviceId), r.ThresholdName, r.Metric, r.Operator, r.ThresholdValue,
             r.Active);
         return StatusCode(StatusCodes.Status201Created, ThresholdResponse.From(threshold));
@@ -72,7 +80,8 @@ public sealed class AlertController : ControllerBase
     /// <summary>A user's thresholds.</summary>
     [HttpGet("users/{userId:guid}/thresholds")]
     public async Task<List<ThresholdResponse>> ThresholdsByUser(Guid userId) =>
-        (await _queries.ThresholdsByUserAsync(userId)).Select(ThresholdResponse.From).ToList();
+        (await _queries.ThresholdsByUserAsync(User.MustBeSelf(userId)))
+        .Select(ThresholdResponse.From).ToList();
 
     // ------------------------------------------------- reglas de inactividad
 
@@ -81,7 +90,7 @@ public sealed class AlertController : ControllerBase
     public async Task<ActionResult<InactivityRuleResponse>> CreateRule(
         [FromBody] CreateInactivityRuleRequest r)
     {
-        var rule = await _commands.CreateInactivityRuleAsync(Guid.Parse(r.UserId),
+        var rule = await _commands.CreateInactivityRuleAsync(User.MustBeSelf(r.UserId),
             Guid.Parse(r.DeviceId), r.RuleName, r.MaxInactiveMinutes, r.Active);
         return StatusCode(StatusCodes.Status201Created, InactivityRuleResponse.From(rule));
     }
@@ -89,7 +98,8 @@ public sealed class AlertController : ControllerBase
     /// <summary>A user's inactivity rules.</summary>
     [HttpGet("users/{userId:guid}/inactivity-rules")]
     public async Task<List<InactivityRuleResponse>> RulesByUser(Guid userId) =>
-        (await _queries.RulesByUserAsync(userId)).Select(InactivityRuleResponse.From).ToList();
+        (await _queries.RulesByUserAsync(User.MustBeSelf(userId)))
+        .Select(InactivityRuleResponse.From).ToList();
 
     // ------------------------------------------ preferencias de notificacion
 
@@ -98,7 +108,7 @@ public sealed class AlertController : ControllerBase
     public async Task<ActionResult<PreferenceResponse>> CreatePreference(
         [FromBody] CreatePreferenceRequest r)
     {
-        var preference = await _commands.CreatePreferenceAsync(Guid.Parse(r.UserId), r.Channel,
+        var preference = await _commands.CreatePreferenceAsync(User.MustBeSelf(r.UserId), r.Channel,
             r.Enabled, r.MinSeverity, r.QuietHoursStart, r.QuietHoursEnd);
         return StatusCode(StatusCodes.Status201Created, PreferenceResponse.From(preference));
     }
@@ -106,7 +116,8 @@ public sealed class AlertController : ControllerBase
     /// <summary>A user's notification preferences.</summary>
     [HttpGet("users/{userId:guid}/notification-preferences")]
     public async Task<List<PreferenceResponse>> PreferencesByUser(Guid userId) =>
-        (await _queries.PreferencesByUserAsync(userId)).Select(PreferenceResponse.From).ToList();
+        (await _queries.PreferencesByUserAsync(User.MustBeSelf(userId)))
+        .Select(PreferenceResponse.From).ToList();
 
     // ------------------------------------------------------ reglas de demanda
 
@@ -116,7 +127,7 @@ public sealed class AlertController : ControllerBase
         [FromBody] CreateDemandRuleRequest request)
     {
         var regla = await _commands.CreateDemandRuleAsync(Guid.Parse(request.SiteId),
-            Guid.Parse(request.UserId), request.RuleName, request.ContractedPowerKw,
+            User.MustBeSelf(request.UserId), request.RuleName, request.ContractedPowerKw,
             request.WarningPercent, request.Active);
         return StatusCode(StatusCodes.Status201Created, DemandRuleResponse.From(regla));
     }

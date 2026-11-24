@@ -7,6 +7,7 @@ public enum ErrorCode
     NOT_FOUND,
     CONFLICT,
     UNAUTHORIZED,
+    FORBIDDEN,
     INTERNAL_ERROR
 }
 
@@ -31,6 +32,17 @@ public sealed class AppException : Exception
     public static AppException Conflict(string message) => new(ErrorCode.CONFLICT, message);
 
     public static AppException Unauthorized(string message) => new(ErrorCode.UNAUTHORIZED, message);
+
+    /// <summary>
+    /// El token es valido pero el dato no es de quien pregunta.
+    /// </summary>
+    /// <remarks>
+    /// Se distingue de <see cref="Unauthorized"/> a proposito: un 401 invita al
+    /// cliente a renovar el token y volver a intentarlo, y aqui renovarlo no
+    /// cambiaria nada. Decirlo con 403 es lo que permite que la web distinga un
+    /// token caducado de un identificador que no le corresponde.
+    /// </remarks>
+    public static AppException Forbidden(string message) => new(ErrorCode.FORBIDDEN, message);
 
     public static AppException Internal(string message) => new(ErrorCode.INTERNAL_ERROR, message);
 }

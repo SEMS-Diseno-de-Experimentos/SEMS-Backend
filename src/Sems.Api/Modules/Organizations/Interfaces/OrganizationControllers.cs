@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Organizations.Application;
+using Sems.Api.Shared.Http;
 using Sems.Api.Shared.Errors;
 using static Sems.Api.Modules.Organizations.Interfaces.OrganizationResources;
 
@@ -28,8 +29,12 @@ public sealed class OrganizationController : ControllerBase
     public async Task<ActionResult<OrganizationResource>> Create(
         [FromBody] CreateOrganizationRequest request)
     {
+        // El alta hace administrador al dueño que venga en el cuerpo, asi que
+        // poner ahi a otro seria darle una organizacion que no ha pedido, y a
+        // uno mismo el mando sobre ella.
         var (organizacion, _) = await _commands.RegisterAsync(request.LegalName, request.TradeName,
-            request.TaxId, request.BusinessType, ParseId(request.OwnerUserId, "owner_user_id"));
+            request.TaxId, request.BusinessType,
+            User.MustBeSelf(request.OwnerUserId, "owner_user_id"));
         return StatusCode(StatusCodes.Status201Created, OrganizationResource.From(organizacion));
     }
 
@@ -37,7 +42,7 @@ public sealed class OrganizationController : ControllerBase
     [HttpGet("/api/v1/users/{userId}/organizations")]
     public async Task<List<MyOrganizationResource>> Mine(string userId)
     {
-        var mias = await _queries.ListMineAsync(ParseId(userId, "user_id"));
+        var mias = await _queries.ListMineAsync(User.MustBeSelf(userId));
         return mias.Select(x => MyOrganizationResource.From(x.Organizacion, x.Vinculo)).ToList();
     }
 

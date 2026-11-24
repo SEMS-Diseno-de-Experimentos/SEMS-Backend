@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Devices.Application;
+using Sems.Api.Shared.Http;
 using static Sems.Api.Modules.Devices.Interfaces.DeviceResources;
 
 namespace Sems.Api.Modules.Devices.Interfaces;
@@ -30,16 +31,21 @@ public sealed class DeviceController : ControllerBase
     public async Task<ActionResult<DeviceResource>> Create([FromBody] CreateDeviceRequest request)
     {
         var device = await _commands.RegisterAsync(request.ExternalDeviceCode,
-            Guid.Parse(request.UserId), Guid.Parse(request.SiteId), ParseOptionalId(request.ZoneId),
+            User.MustBeSelf(request.UserId), Guid.Parse(request.SiteId),
+            ParseOptionalId(request.ZoneId),
             request.DeviceName, request.DeviceType,
             request.Brand, request.Model, request.ConnectionProtocol);
         return StatusCode(StatusCodes.Status201Created, DeviceResource.From(device));
     }
 
-    /// <summary>Lists every device.</summary>
+    /// <summary>Lists the caller's devices.</summary>
+    /// <remarks>
+    /// Antes devolvia los equipos de todos los usuarios: la ruta sin
+    /// identificador era el camino mas corto para ver el inventario ajeno.
+    /// </remarks>
     [HttpGet("devices")]
-    public async Task<List<DeviceResource>> List() =>
-        (await _queries.AllDevicesAsync()).Select(DeviceResource.From).ToList();
+    public async Task<List<DeviceResource>> Mine() =>
+        (await _queries.DevicesByUserAsync(User.CallerId())).Select(DeviceResource.From).ToList();
 
     /// <summary>Gets a device by its identifier.</summary>
     [HttpGet("devices/{deviceId:guid}")]
@@ -49,7 +55,8 @@ public sealed class DeviceController : ControllerBase
     /// <summary>Lists a user's devices.</summary>
     [HttpGet("users/{userId:guid}/devices")]
     public async Task<List<DeviceResource>> ByUser(Guid userId) =>
-        (await _queries.DevicesByUserAsync(userId)).Select(DeviceResource.From).ToList();
+        (await _queries.DevicesByUserAsync(User.MustBeSelf(userId)))
+        .Select(DeviceResource.From).ToList();
 
     /// <summary>Devices installed at a site.</summary>
     [HttpGet("sites/{siteId:guid}/devices")]
@@ -122,7 +129,8 @@ public sealed class DeviceBindingController : ControllerBase
     /// <summary>Lists the bindings of a user.</summary>
     [HttpGet("users/{userId:guid}/bindings")]
     public async Task<List<DeviceBindingResource>> ByUser(Guid userId) =>
-        (await _queries.BindingsByUserAsync(userId)).Select(DeviceBindingResource.From).ToList();
+        (await _queries.BindingsByUserAsync(User.MustBeSelf(userId)))
+        .Select(DeviceBindingResource.From).ToList();
 
     /// <summary>Unlinks a device.</summary>
     [HttpPatch("bindings/{bindingId:guid}/unlink")]

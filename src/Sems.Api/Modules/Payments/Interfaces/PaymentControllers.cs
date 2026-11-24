@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Payments.Application;
+using Sems.Api.Shared.Http;
 using static Sems.Api.Modules.Payments.Interfaces.PaymentResources;
 
 namespace Sems.Api.Modules.Payments.Interfaces;
@@ -26,7 +27,7 @@ public sealed class PaymentController : ControllerBase
         [FromBody] ProcessPaymentRequest request)
     {
         var result = await _commands.ProcessAsync(Guid.Parse(request.SubscriptionId),
-            Guid.Parse(request.UserId), Guid.Parse(request.PaymentMethodId), request.Amount,
+            User.MustBeSelf(request.UserId), Guid.Parse(request.PaymentMethodId), request.Amount,
             request.Currency, request.PaymentMethod);
 
         var body = new ProcessPaymentResponse(PaymentResponse.From(result.Payment),
@@ -48,7 +49,7 @@ public sealed class PaymentController : ControllerBase
         Guid? subscriptionId = string.IsNullOrWhiteSpace(request.SubscriptionId)
             ? null : Guid.Parse(request.SubscriptionId);
 
-        var session = await _commands.CreateCheckoutSessionAsync(Guid.Parse(request.UserId),
+        var session = await _commands.CreateCheckoutSessionAsync(User.MustBeSelf(request.UserId),
             subscriptionId, request.PlanName, request.Amount, request.Currency,
             request.SuccessUrl, request.CancelUrl);
 
@@ -58,7 +59,8 @@ public sealed class PaymentController : ControllerBase
     /// <summary>A user's payments.</summary>
     [HttpGet("user/{userId:guid}")]
     public async Task<List<PaymentResponse>> ByUser(Guid userId) =>
-        (await _queries.PaymentsByUserAsync(userId)).Select(PaymentResponse.From).ToList();
+        (await _queries.PaymentsByUserAsync(User.MustBeSelf(userId)))
+        .Select(PaymentResponse.From).ToList();
 
     /// <summary>Payments of a subscription.</summary>
     [HttpGet("subscription/{subscriptionId:guid}")]
@@ -92,7 +94,7 @@ public sealed class PaymentMethodController : ControllerBase
     public async Task<ActionResult<PaymentMethodResponse>> Register(
         [FromBody] RegisterPaymentMethodRequest request)
     {
-        var method = await _commands.RegisterAsync(Guid.Parse(request.UserId), request.Type,
+        var method = await _commands.RegisterAsync(User.MustBeSelf(request.UserId), request.Type,
             request.StripePaymentMethodId, request.IsDefault);
         return StatusCode(StatusCodes.Status201Created, PaymentMethodResponse.From(method));
     }
@@ -100,7 +102,8 @@ public sealed class PaymentMethodController : ControllerBase
     /// <summary>A user's payment methods.</summary>
     [HttpGet("user/{userId:guid}")]
     public async Task<List<PaymentMethodResponse>> ByUser(Guid userId) =>
-        (await _queries.MethodsByUserAsync(userId)).Select(PaymentMethodResponse.From).ToList();
+        (await _queries.MethodsByUserAsync(User.MustBeSelf(userId)))
+        .Select(PaymentMethodResponse.From).ToList();
 
     /// <summary>Marks a payment method as the default one.</summary>
     [HttpPut("{paymentMethodId:guid}/default")]
