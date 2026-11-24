@@ -1,9 +1,8 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Iam.Application;
 using Sems.Api.Modules.Iam.Domain.Repositories;
 using Sems.Api.Shared.Errors;
+using Sems.Api.Shared.Http;
 
 namespace Sems.Api.Modules.Iam.Interfaces;
 
@@ -43,7 +42,7 @@ public sealed class UserController : ControllerBase
     [HttpGet("me")]
     public async Task<UserResource> Me(CancellationToken ct)
     {
-        var user = await _users.FindByIdAsync(UsuarioDelToken(), ct)
+        var user = await _users.FindByIdAsync(User.CallerId(), ct)
             ?? throw AppException.NotFound("user not found");
         return UserResource.From(user);
     }
@@ -55,23 +54,6 @@ public sealed class UserController : ControllerBase
     [HttpPut("me")]
     public async Task<UserResource> UpdateMe([FromBody] AuthResources.UpdateProfileRequest request,
         CancellationToken ct) =>
-        UserResource.From(await _profiles.UpdateProfileAsync(UsuarioDelToken(), request.FullName,
+        UserResource.From(await _profiles.UpdateProfileAsync(User.CallerId(), request.FullName,
             request.Segment, ct));
-
-    /// <summary>
-    /// Lee el identificador del usuario desde el token.
-    ///
-    /// <para>Se consultan los dos nombres posibles porque JwtBearer traduce
-    /// <c>sub</c> a <see cref="ClaimTypes.NameIdentifier"/> cuando el mapeo de
-    /// nombres esta activo, y lo deja tal cual cuando no lo esta. Mirar solo uno
-    /// funciona hasta que alguien cambia esa opcion.</para>
-    /// </summary>
-    private Guid UsuarioDelToken()
-    {
-        var valor = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        return Guid.TryParse(valor, out var id)
-            ? id
-            : throw AppException.Unauthorized("token does not carry a valid user identifier");
-    }
 }

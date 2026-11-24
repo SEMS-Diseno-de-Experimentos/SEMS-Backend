@@ -59,6 +59,7 @@ public sealed class ExceptionHandlingMiddleware
         ErrorCode.NOT_FOUND => StatusCodes.Status404NotFound,
         ErrorCode.CONFLICT => StatusCodes.Status409Conflict,
         ErrorCode.UNAUTHORIZED => StatusCodes.Status401Unauthorized,
+        ErrorCode.FORBIDDEN => StatusCodes.Status403Forbidden,
         _ => StatusCodes.Status500InternalServerError
     };
 
