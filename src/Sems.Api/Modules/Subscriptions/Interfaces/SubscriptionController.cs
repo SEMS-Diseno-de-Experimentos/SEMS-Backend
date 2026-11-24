@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Subscriptions.Application;
+using Sems.Api.Shared.Http;
 using static Sems.Api.Modules.Subscriptions.Interfaces.SubscriptionResources;
 
 namespace Sems.Api.Modules.Subscriptions.Interfaces;
@@ -38,8 +39,12 @@ public sealed class SubscriptionController : ControllerBase
 
     /// <summary>A user's subscriptions.</summary>
     [HttpGet("subscriptions/users/{userId}")]
-    public async Task<List<SubscriptionResource>> ByUser(string userId) =>
-        (await _service.SubscriptionsByUserAsync(userId)).Select(SubscriptionResource.From).ToList();
+    public async Task<List<SubscriptionResource>> ByUser(string userId)
+    {
+        User.MustBeSelf(userId);
+        return (await _service.SubscriptionsByUserAsync(userId))
+            .Select(SubscriptionResource.From).ToList();
+    }
 
     /// <summary>Gets a subscription by its identifier.</summary>
     [HttpGet("subscriptions/{subscriptionId:guid}")]
@@ -51,6 +56,8 @@ public sealed class SubscriptionController : ControllerBase
     public async Task<ActionResult<SubscriptionResource>> Create(
         [FromBody] CreateSubscriptionRequest request)
     {
+        // Suscribirse a nombre de otro le cargaria el plan a quien no lo pidio.
+        User.MustBeSelf(request.UserId);
         var subscription = await _service.CreateAsync(request.UserId, Guid.Parse(request.PlanId), null);
         return StatusCode(StatusCodes.Status201Created, SubscriptionResource.From(subscription));
     }
