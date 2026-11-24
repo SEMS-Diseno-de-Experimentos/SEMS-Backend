@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Energy.Application;
+using Sems.Api.Modules.Energy.Domain.Model;
 using static Sems.Api.Modules.Energy.Interfaces.EnergyResources;
 
 namespace Sems.Api.Modules.Energy.Interfaces;
@@ -91,30 +92,32 @@ public sealed class EnergyReadingController : ControllerBase
     [HttpGet("user/{userId}")]
     public async Task<List<ReadingResponse>> ByUser(string userId,
         [FromQuery] int limit = 100) =>
-        (await _queries.ReadingsByUserAsync(userId, limit)).Select(ReadingResponse.From).ToList();
+        Lecturas.Valorizadas(await _queries.WithCostAsync(await _queries.ReadingsByUserAsync(userId, limit)));
 
     /// <summary>Readings from a device.</summary>
     [HttpGet("device/{deviceId}")]
     public async Task<List<ReadingResponse>> ByDevice(string deviceId,
         [FromQuery] int limit = 50, [FromQuery] int skip = 0) =>
-        (await _queries.ReadingsByDeviceAsync(deviceId, limit, skip))
-        .Select(ReadingResponse.From).ToList();
+        Lecturas.Valorizadas(await _queries.WithCostAsync(
+            await _queries.ReadingsByDeviceAsync(deviceId, limit, skip)));
 
     /// <summary>A user's readings within a date range.</summary>
     [HttpGet("range")]
     public async Task<List<ReadingResponse>> ByRange([FromQuery] string userId,
         [FromQuery] DateTime from, [FromQuery] DateTime to) =>
-        (await _queries.ReadingsByRangeAsync(userId, from, to)).Select(ReadingResponse.From).ToList();
+        Lecturas.Valorizadas(await _queries.WithCostAsync(
+            await _queries.ReadingsByRangeAsync(userId, from, to)));
 
     /// <summary>Latest reading from a meter.</summary>
     [HttpGet("meter/{meterId}/latest")]
     public async Task<ReadingResponse> LatestByMeter(string meterId) =>
-        ReadingResponse.From(await _queries.LatestByMeterAsync(meterId));
+        await Lecturas.Una(_queries, await _queries.LatestByMeterAsync(meterId));
 
     /// <summary>Gets a reading by its identifier.</summary>
     [HttpGet("{readingId:guid}")]
     public async Task<ReadingResponse> ById(Guid readingId) =>
-        ReadingResponse.From(await _queries.ReadingByIdAsync(readingId));
+        await Lecturas.Una(_queries, await _queries.ReadingByIdAsync(readingId));
+
 }
 
 /// <summary>
@@ -156,14 +159,14 @@ public sealed class EnergyPricingController : ControllerBase
     /// <summary>Current consumption of a device.</summary>
     [HttpGet("devices/{deviceId}/consumption/current")]
     public async Task<ReadingResponse> CurrentConsumption(string deviceId) =>
-        ReadingResponse.From(await _queries.LatestByDeviceAsync(deviceId));
+        await Lecturas.Una(_queries, await _queries.LatestByDeviceAsync(deviceId));
 
     /// <summary>Consumption history of a device.</summary>
     [HttpGet("devices/{deviceId}/consumption/history")]
     public async Task<List<ReadingResponse>> ConsumptionHistory(string deviceId,
         [FromQuery] int limit = 50, [FromQuery] int skip = 0) =>
-        (await _queries.ReadingsByDeviceAsync(deviceId, limit, skip))
-        .Select(ReadingResponse.From).ToList();
+        Lecturas.Valorizadas(await _queries.WithCostAsync(
+            await _queries.ReadingsByDeviceAsync(deviceId, limit, skip)));
 }
 
 /// <summary>Consumption summaries aggregated by device and period.</summary>
@@ -257,4 +260,25 @@ public sealed class UserGoalController : ControllerBase
     [HttpPut]
     public async Task<GoalResponse> SetGoal(string userId, [FromBody] SetGoalRequest request) =>
         GoalResponse.From(await _commands.SetUserGoalAsync(userId, request.MonthlyGoalKwh));
+}
+
+/// <summary>
+/// Paso de lecturas valorizadas al recurso JSON.
+/// </summary>
+/// <remarks>
+/// Lo comparten los dos controladores que devuelven lecturas, para que el
+/// campo del coste aparezca siempre por el mismo camino y no haya endpoints
+/// que lo publiquen y otros que no.
+/// </remarks>
+internal static class Lecturas
+{
+    public static List<ReadingResponse> Valorizadas(
+        IEnumerable<EnergyQueryService.ReadingWithCost> lecturas) =>
+        lecturas.Select(l => ReadingResponse.From(l.Reading, l.EstimatedCost)).ToList();
+
+    public static async Task<ReadingResponse> Una(EnergyQueryService queries, EnergyReading lectura)
+    {
+        var valorizada = (await queries.WithCostAsync(new[] { lectura }))[0];
+        return ReadingResponse.From(valorizada.Reading, valorizada.EstimatedCost);
+    }
 }
