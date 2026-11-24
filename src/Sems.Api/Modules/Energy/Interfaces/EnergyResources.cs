@@ -96,11 +96,18 @@ public static class EnergyResources
         [property: JsonPropertyName("timestamp")] DateTime Timestamp,
         [property: JsonPropertyName("reading_type")] string ReadingType,
         [property: JsonPropertyName("phase")] string Phase,
-        [property: JsonPropertyName("created_at")] DateTime CreatedAt)
+        [property: JsonPropertyName("created_at")] DateTime CreatedAt,
+        // Lo que costo la energia de esta lectura, con la tarifa del local y la
+        // franja en que se midio. Viaja ausente, y no en cero, cuando el local
+        // no tiene tarifa reconocida: cero es un importe y esto es "no se sabe".
+        [property: JsonPropertyName("estimated_cost")]
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        decimal? EstimatedCost = null)
     {
-        public static ReadingResponse From(EnergyReading r) => new(
+        public static ReadingResponse From(EnergyReading r, decimal? estimatedCost = null) => new(
             r.Id.ToString(), r.UserId, r.MeterId, r.DeviceId, r.PowerWatts, r.Voltage, r.Current,
-            r.Frequency, r.EnergyKwh, r.Timestamp, r.ReadingType, r.Phase, r.CreatedAt);
+            r.Frequency, r.EnergyKwh, r.Timestamp, r.ReadingType, r.Phase, r.CreatedAt,
+            estimatedCost);
     }
 
     public sealed record ConsumptionResponse(

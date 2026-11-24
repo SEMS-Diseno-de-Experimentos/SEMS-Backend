@@ -282,15 +282,89 @@ public sealed class EnergyQueryService
     private readonly IDeviceConsumptionRepository _consumptions;
     private readonly IConsumptionAlertRepository _alerts;
     private readonly IUserGoalRepository _goals;
+    private readonly IEnergyPricingProvider _pricing;
+    private readonly ISiteCatalog _sites;
 
     public EnergyQueryService(IEnergyMeterRepository meters, IEnergyReadingRepository readings,
-        IDeviceConsumptionRepository consumptions, IConsumptionAlertRepository alerts, IUserGoalRepository goals)
+        IDeviceConsumptionRepository consumptions, IConsumptionAlertRepository alerts,
+        IUserGoalRepository goals, IEnergyPricingProvider pricing, ISiteCatalog sites)
     {
         _meters = meters;
         _readings = readings;
         _consumptions = consumptions;
         _alerts = alerts;
         _goals = goals;
+        _pricing = pricing;
+        _sites = sites;
+    }
+
+    /// <summary>Una lectura y lo que costo su energia, si se pudo valorizar.</summary>
+    public sealed record ReadingWithCost(EnergyReading Reading, decimal? EstimatedCost);
+
+    /// <summary>
+    /// Pone precio a cada lectura con la tarifa del local de su medidor.
+    /// </summary>
+    /// <remarks>
+    /// <para>Solo energia: la franja horaria del instante medido decide si el
+    /// kWh va a precio de punta o de fuera de punta. El cargo por potencia no
+    /// entra aqui porque no es de una lectura sino del mes entero, y repartirlo
+    /// entre lecturas daria un numero que no significa nada.</para>
+    ///
+    /// <para>Se consulta un medidor por medidor distinto y un local por local
+    /// distinto, no uno por lectura: doscientas lecturas de una tienda son un
+    /// medidor y un local. Sin medidor, sin local o sin tarifa reconocida el
+    /// coste queda en null y la lectura se muestra igual, con sus kWh.</para>
+    /// </remarks>
+    public async Task<List<ReadingWithCost>> WithCostAsync(IReadOnlyList<EnergyReading> lecturas,
+        CancellationToken ct = default)
+    {
+        if (lecturas.Count == 0)
+        {
+            return new List<ReadingWithCost>();
+        }
+
+        var medidores = new Dictionary<string, EnergyMeter?>();
+        foreach (var meterId in lecturas.Select(l => l.MeterId).Distinct())
+        {
+            medidores[meterId] = Guid.TryParse(meterId, out var id)
+                ? await _meters.FindByIdAsync(id, ct)
+                : null;
+        }
+
+        var locales = new Dictionary<Guid, ISiteCatalog.SiteSummary?>();
+        foreach (var siteId in medidores.Values
+                     .Where(m => m is not null && m.SiteId != Guid.Empty)
+                     .Select(m => m!.SiteId)
+                     .Distinct())
+        {
+            locales[siteId] = await _sites.SiteSummaryAsync(siteId, ct);
+        }
+
+        var tarifas = new Dictionary<Guid, CommercialTariff?>();
+        foreach (var (siteId, local) in locales)
+        {
+            tarifas[siteId] = _pricing.TariffOrNull(local?.TariffCategory);
+        }
+
+        return lecturas.Select(lectura =>
+        {
+            var medidor = medidores.GetValueOrDefault(lectura.MeterId);
+            if (medidor is null
+                || !locales.TryGetValue(medidor.SiteId, out var local) || local is null
+                || !tarifas.TryGetValue(medidor.SiteId, out var tarifa) || tarifa is null)
+            {
+                return new ReadingWithCost(lectura, null);
+            }
+
+            var kwh = (decimal)lectura.EnergyKwh;
+            var esPunta = HorarioPunta.FranjaDe(lectura.Timestamp, local.ExcludesSundaysFromPeak)
+                          == FranjaHoraria.PUNTA;
+            var coste = esPunta
+                ? tarifa.CostoDeEnergia(kwh, 0m)
+                : tarifa.CostoDeEnergia(0m, kwh);
+
+            return new ReadingWithCost(lectura, Math.Round(coste, 2));
+        }).ToList();
     }
 
     public async Task<EnergyMeter> MeterByIdAsync(Guid meterId, CancellationToken ct = default) =>
