@@ -11,21 +11,56 @@ public static class AuthResources
 {
     // ------------------------------------------------------------- peticiones
 
-    public sealed record RegisterRequest(
-        [Required(ErrorMessage = "is required")]
-        [EmailAddress(ErrorMessage = "must be a valid email")] string EmailAddress,
-        [Required(ErrorMessage = "is required")]
-        [MinLength(8, ErrorMessage = "must be at least 8 characters")] string Password,
-        string? Role,
-        // El nombre y el segmento son opcionales: el alta funciona sin ellos.
-        // Antes el cliente los pedia en el formulario y los guardaba solo en el
-        // navegador, de modo que se perdian al entrar desde otro equipo.
-        [MaxLength(120, ErrorMessage = "must be at most 120 characters")] string? FullName,
-        string? Segment);
+    public sealed class RegisterRequest
+    {
+        private string? _emailAddress;
 
-    public sealed record LoginRequest(
-        [Required(ErrorMessage = "is required")] string EmailAddress,
-        [Required(ErrorMessage = "is required")] string Password);
+        [Required(ErrorMessage = "is required")]
+        [EmailAddress(ErrorMessage = "must be a valid email")]
+        public string EmailAddress
+        {
+            get => !string.IsNullOrWhiteSpace(_emailAddress) ? _emailAddress : (Email ?? string.Empty);
+            set => _emailAddress = value;
+        }
+
+        public string? Email
+        {
+            get => _emailAddress;
+            set => _emailAddress ??= value;
+        }
+
+        [Required(ErrorMessage = "is required")]
+        [MinLength(8, ErrorMessage = "must be at least 8 characters")]
+        public string Password { get; set; } = string.Empty;
+
+        public string? Role { get; set; }
+
+        [MaxLength(120, ErrorMessage = "must be at most 120 characters")]
+        public string? FullName { get; set; }
+
+        public string? Segment { get; set; }
+    }
+
+    public sealed class LoginRequest
+    {
+        private string? _emailAddress;
+
+        [Required(ErrorMessage = "is required")]
+        public string EmailAddress
+        {
+            get => !string.IsNullOrWhiteSpace(_emailAddress) ? _emailAddress : (Email ?? string.Empty);
+            set => _emailAddress = value;
+        }
+
+        public string? Email
+        {
+            get => _emailAddress;
+            set => _emailAddress ??= value;
+        }
+
+        [Required(ErrorMessage = "is required")]
+        public string Password { get; set; } = string.Empty;
+    }
 
     /// <summary>
     /// Token de identidad que devuelve el boton de Google en el navegador.
@@ -41,9 +76,24 @@ public static class AuthResources
     public sealed record VerifyRequest(
         [Required(ErrorMessage = "is required")] string Token);
 
-    public sealed record ForgotPasswordRequest(
+    public sealed class ForgotPasswordRequest
+    {
+        private string? _emailAddress;
+
         [Required(ErrorMessage = "is required")]
-        [EmailAddress(ErrorMessage = "must be a valid email")] string EmailAddress);
+        [EmailAddress(ErrorMessage = "must be a valid email")]
+        public string EmailAddress
+        {
+            get => !string.IsNullOrWhiteSpace(_emailAddress) ? _emailAddress : (Email ?? string.Empty);
+            set => _emailAddress = value;
+        }
+
+        public string? Email
+        {
+            get => _emailAddress;
+            set => _emailAddress ??= value;
+        }
+    }
 
     public sealed record ResetPasswordRequest(
         [Required(ErrorMessage = "is required")] string Token,
