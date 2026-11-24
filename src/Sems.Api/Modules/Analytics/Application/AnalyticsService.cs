@@ -90,6 +90,11 @@ public sealed class AnalyticsService
     public Task<List<Recommendation>> RecommendationsByUserAsync(string userId,
         CancellationToken ct = default) => _recommendations.FindByUserIdAsync(userId, ct);
 
+    public async Task<Recommendation> RecommendationByIdAsync(Guid id,
+        CancellationToken ct = default) =>
+        await _recommendations.FindByIdAsync(id, ct)
+        ?? throw AppException.NotFound($"Recommendation '{id}' not found");
+
     public async Task<Recommendation> ApplyRecommendationAsync(Guid id, CancellationToken ct = default)
     {
         var recommendation = await _recommendations.FindByIdAsync(id, ct)
@@ -108,6 +113,10 @@ public sealed class AnalyticsService
 
     public Task<List<Anomaly>> AnomaliesByUserAsync(string userId, CancellationToken ct = default) =>
         _anomalies.FindByUserIdAsync(userId, ct);
+
+    public async Task<Anomaly> AnomalyByIdAsync(Guid id, CancellationToken ct = default) =>
+        await _anomalies.FindByIdAsync(id, ct)
+        ?? throw AppException.NotFound($"Anomaly '{id}' not found");
 
     public async Task<Anomaly> ResolveAnomalyAsync(Guid id, CancellationToken ct = default)
     {
