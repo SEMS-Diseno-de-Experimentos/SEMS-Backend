@@ -108,15 +108,28 @@ public class ConsumptionBreakdownEndpointsTests : IClassFixture<SemsApiFactory>
         Assert.True(IsEmpty(unassigned, "zone_id"));
     }
 
+    /// <summary>
+    /// Un local que no existe responde igual que uno que no es del llamante.
+    /// </summary>
+    /// <remarks>
+    /// Antes devolvia 404 y ahora 403, porque la autorizacion va antes de la
+    /// consulta. El cambio es a proposito: si el inexistente diera 404 y el
+    /// ajeno 403, cualquiera podria averiguar que identificadores de local
+    /// existen pidiendolos uno a uno, que es justo lo que el 403 evita.
+    /// </remarks>
     [Fact]
-    public async Task ZoneConsumption_UnknownSite_Returns404()
+    public async Task ZoneConsumption_UnknownSite_IsIndistinguishableFromSomeoneElsesSite()
     {
         var layout = await LayoutAsync();
 
-        var response = await layout.User.Client.GetAsync(
+        var inexistente = await layout.User.Client.GetAsync(
             $"/api/v1/sites/{Guid.NewGuid()}/zone-consumption");
+        Assert.Equal(HttpStatusCode.Forbidden, inexistente.StatusCode);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var ajeno = await _factory.CreateUserAsync();
+        var delOtro = await ajeno.Client.GetAsync(
+            $"/api/v1/sites/{layout.SiteId}/zone-consumption");
+        Assert.Equal(HttpStatusCode.Forbidden, delOtro.StatusCode);
     }
 
     [Fact]

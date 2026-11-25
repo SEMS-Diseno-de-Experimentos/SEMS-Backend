@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Analytics.Application;
 using Sems.Api.Shared.Http;
+using Sems.Api.Shared.Security;
 using Sems.Api.Modules.Analytics.Domain.Model;
 using static Sems.Api.Modules.Analytics.Interfaces.AnalyticsResources;
 
@@ -89,9 +90,19 @@ public sealed class AnalyticsController : ControllerBase
     }
 
     /// <summary>Marks a recommendation as applied.</summary>
+    /// <remarks>
+    /// Un hallazgo es de la persona para la que se calculo, no de un local: la
+    /// recomendacion de apagar un congelador de noche no se la puede dar por
+    /// aplicada un tercero.
+    /// </remarks>
     [HttpPatch("recommendations/{recommendationId:guid}/apply")]
-    public async Task<RecommendationResponse> ApplyRecommendation(Guid recommendationId) =>
-        RecommendationResponse.From(await _service.ApplyRecommendationAsync(recommendationId));
+    public async Task<RecommendationResponse> ApplyRecommendation(Guid recommendationId)
+    {
+        AccessGuards.MustOwn(User.CallerId(),
+            (await _service.RecommendationByIdAsync(recommendationId)).UserId);
+        return RecommendationResponse.From(
+            await _service.ApplyRecommendationAsync(recommendationId));
+    }
 
     // ------------------------------------------------------------ anomalies
 
@@ -116,8 +127,12 @@ public sealed class AnalyticsController : ControllerBase
 
     /// <summary>Marks an anomaly as resolved.</summary>
     [HttpPatch("anomalies/{anomalyId:guid}/resolve")]
-    public async Task<AnomalyResponse> ResolveAnomaly(Guid anomalyId) =>
-        AnomalyResponse.From(await _service.ResolveAnomalyAsync(anomalyId));
+    public async Task<AnomalyResponse> ResolveAnomaly(Guid anomalyId)
+    {
+        AccessGuards.MustOwn(User.CallerId(),
+            (await _service.AnomalyByIdAsync(anomalyId)).UserId);
+        return AnomalyResponse.From(await _service.ResolveAnomalyAsync(anomalyId));
+    }
 
     // ------------------------------------------- device-identifications
 

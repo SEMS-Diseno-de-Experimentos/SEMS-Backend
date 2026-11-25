@@ -104,6 +104,13 @@ builder.Services.AddScoped<Sems.Api.Modules.Energy.Domain.Services.IMeterAllowan
 // Y el de organizaciones pregunta por el cupo de locales del plan contratado.
 builder.Services.AddScoped<Sems.Api.Modules.Organizations.Domain.Services.IPlanAllowance,
     Sems.Api.Modules.Organizations.Infrastructure.SubscriptionsPlanAllowance>();
+
+// El alcance de cada usuario lo contestan las membresias, que son de
+// organizaciones. Por peticion y no singleton: recuerda los vinculos de quien
+// llama mientras dura la peticion, y un cambio de papel surte efecto en la
+// siguiente.
+builder.Services.AddScoped<Sems.Api.Shared.Security.IAccessPolicy,
+    Sems.Api.Modules.Organizations.Infrastructure.MembershipAccessPolicy>();
 builder.Services.AddScoped<ConsumptionBreakdownService>();
 builder.Services.AddScoped<DeviceCommandService>();
 builder.Services.AddScoped<DeviceQueryService>();

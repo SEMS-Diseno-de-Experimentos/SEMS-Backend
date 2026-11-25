@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Energy.Application;
 using Sems.Api.Modules.Energy.Domain.Model;
+using System.Security.Claims;
 using Sems.Api.Shared.Http;
+using Sems.Api.Shared.Security;
+using Sems.Api.Shared.Security;
 using static Sems.Api.Modules.Energy.Interfaces.EnergyResources;
 
 namespace Sems.Api.Modules.Energy.Interfaces;
@@ -14,11 +17,14 @@ public sealed class EnergyMeterController : ControllerBase
 {
     private readonly EnergyCommandService _commands;
     private readonly EnergyQueryService _queries;
+    private readonly IAccessPolicy _access;
 
-    public EnergyMeterController(EnergyCommandService commands, EnergyQueryService queries)
+    public EnergyMeterController(EnergyCommandService commands, EnergyQueryService queries,
+        IAccessPolicy access)
     {
         _commands = commands;
         _queries = queries;
+        _access = access;
     }
 
     /// <summary>Registers a new meter.</summary>
@@ -46,30 +52,68 @@ public sealed class EnergyMeterController : ControllerBase
     }
 
     /// <summary>Lists the meters installed in a site.</summary>
+    /// <remarks>
+    /// Esta ruta es del local y no de la persona, asi que quien supervisa el
+    /// local ve sus medidores aunque los diera de alta un operario.
+    /// </remarks>
     [HttpGet("site/{siteId:guid}")]
-    public async Task<List<MeterResponse>> BySite(Guid siteId) =>
-        (await _queries.MetersBySiteAsync(siteId)).Select(MeterResponse.From).ToList();
+    public async Task<List<MeterResponse>> BySite(Guid siteId)
+    {
+        await _access.MustReachSiteAsync(User.CallerId(), siteId);
+        return (await _queries.MetersBySiteAsync(siteId)).Select(MeterResponse.From).ToList();
+    }
 
     /// <summary>Lists the meters of a zone.</summary>
     [HttpGet("zone/{zoneId:guid}")]
-    public async Task<List<MeterResponse>> ByZone(Guid zoneId) =>
-        (await _queries.MetersByZoneAsync(zoneId)).Select(MeterResponse.From).ToList();
+    public async Task<List<MeterResponse>> ByZone(Guid zoneId)
+    {
+        await _access.MustReachZoneAsync(User.CallerId(), zoneId);
+        return (await _queries.MetersByZoneAsync(zoneId)).Select(MeterResponse.From).ToList();
+    }
 
     /// <summary>Reassigns a meter to another zone of the same site.</summary>
     [HttpPatch("{meterId:guid}/zone")]
     public async Task<MeterResponse> ReassignZone(Guid meterId,
-        [FromBody] ReassignMeterZoneRequest request) =>
-        MeterResponse.From(await _commands.ReassignMeterZoneAsync(meterId, request.ZoneId));
+        [FromBody] ReassignMeterZoneRequest request)
+    {
+        await DebeAlcanzarElMedidorAsync(meterId);
+        return MeterResponse.From(await _commands.ReassignMeterZoneAsync(meterId, request.ZoneId));
+    }
 
     /// <summary>Deactivates a meter.</summary>
     [HttpPatch("{meterId:guid}/deactivate")]
-    public async Task<MeterResponse> Deactivate(Guid meterId) =>
-        MeterResponse.From(await _commands.DeactivateMeterAsync(meterId));
+    public async Task<MeterResponse> Deactivate(Guid meterId)
+    {
+        // Dar de baja el medidor de otro local corta la medicion de un
+        // suministro que no es del llamante: es la escritura mas dañina que
+        // habia abierta.
+        await DebeAlcanzarElMedidorAsync(meterId);
+        return MeterResponse.From(await _commands.DeactivateMeterAsync(meterId));
+    }
 
     /// <summary>Gets a meter by its identifier.</summary>
     [HttpGet("{meterId:guid}")]
-    public async Task<MeterResponse> ById(Guid meterId) =>
-        MeterResponse.From(await _queries.MeterByIdAsync(meterId));
+    public async Task<MeterResponse> ById(Guid meterId)
+    {
+        var medidor = await _queries.MeterByIdAsync(meterId);
+        await _access.MustOwnOrReachSiteAsync(User.CallerId(), medidor.UserId, medidor.SiteId);
+        return MeterResponse.From(medidor);
+    }
+
+    /// <summary>
+    /// El medidor es del llamante, o esta en un local que alcanza.
+    /// </summary>
+    /// <remarks>
+    /// Cuesta una lectura por clave primaria antes de cada escritura. Es el
+    /// precio de dejar la capa de aplicacion sin guardias, que es la que usan
+    /// el sembrador y los manejadores de eventos: esos no llaman en nombre de
+    /// nadie y no tienen token que comprobar.
+    /// </remarks>
+    private async Task DebeAlcanzarElMedidorAsync(Guid meterId)
+    {
+        var medidor = await _queries.MeterByIdAsync(meterId);
+        await _access.MustOwnOrReachSiteAsync(User.CallerId(), medidor.UserId, medidor.SiteId);
+    }
 }
 
 /// <summary>Individual readings sent by the meters.</summary>
@@ -115,9 +159,12 @@ public sealed class EnergyReadingController : ControllerBase
     /// <summary>Readings from a device.</summary>
     [HttpGet("device/{deviceId}")]
     public async Task<List<ReadingResponse>> ByDevice(string deviceId,
-        [FromQuery] int limit = 50, [FromQuery] int skip = 0) =>
-        Lecturas.Valorizadas(await _queries.WithCostAsync(
-            await _queries.ReadingsByDeviceAsync(deviceId, limit, skip)));
+        [FromQuery] int limit = 50, [FromQuery] int skip = 0)
+    {
+        var lecturas = await _queries.ReadingsByDeviceAsync(deviceId, limit, skip);
+        Lecturas.DebenSerDe(User, lecturas);
+        return Lecturas.Valorizadas(await _queries.WithCostAsync(lecturas));
+    }
 
     /// <summary>A user's readings within a date range.</summary>
     /// <remarks>
@@ -135,13 +182,21 @@ public sealed class EnergyReadingController : ControllerBase
 
     /// <summary>Latest reading from a meter.</summary>
     [HttpGet("meter/{meterId}/latest")]
-    public async Task<ReadingResponse> LatestByMeter(string meterId) =>
-        await Lecturas.Una(_queries, await _queries.LatestByMeterAsync(meterId));
+    public async Task<ReadingResponse> LatestByMeter(string meterId)
+    {
+        var lectura = await _queries.LatestByMeterAsync(meterId);
+        Lecturas.DebenSerDe(User, new[] { lectura });
+        return await Lecturas.Una(_queries, lectura);
+    }
 
     /// <summary>Gets a reading by its identifier.</summary>
     [HttpGet("{readingId:guid}")]
-    public async Task<ReadingResponse> ById(Guid readingId) =>
-        await Lecturas.Una(_queries, await _queries.ReadingByIdAsync(readingId));
+    public async Task<ReadingResponse> ById(Guid readingId)
+    {
+        var lectura = await _queries.ReadingByIdAsync(readingId);
+        Lecturas.DebenSerDe(User, new[] { lectura });
+        return await Lecturas.Una(_queries, lectura);
+    }
 
 }
 
@@ -183,15 +238,22 @@ public sealed class EnergyPricingController : ControllerBase
 
     /// <summary>Current consumption of a device.</summary>
     [HttpGet("devices/{deviceId}/consumption/current")]
-    public async Task<ReadingResponse> CurrentConsumption(string deviceId) =>
-        await Lecturas.Una(_queries, await _queries.LatestByDeviceAsync(deviceId));
+    public async Task<ReadingResponse> CurrentConsumption(string deviceId)
+    {
+        var lectura = await _queries.LatestByDeviceAsync(deviceId);
+        Lecturas.DebenSerDe(User, new[] { lectura });
+        return await Lecturas.Una(_queries, lectura);
+    }
 
     /// <summary>Consumption history of a device.</summary>
     [HttpGet("devices/{deviceId}/consumption/history")]
     public async Task<List<ReadingResponse>> ConsumptionHistory(string deviceId,
-        [FromQuery] int limit = 50, [FromQuery] int skip = 0) =>
-        Lecturas.Valorizadas(await _queries.WithCostAsync(
-            await _queries.ReadingsByDeviceAsync(deviceId, limit, skip)));
+        [FromQuery] int limit = 50, [FromQuery] int skip = 0)
+    {
+        var lecturas = await _queries.ReadingsByDeviceAsync(deviceId, limit, skip);
+        Lecturas.DebenSerDe(User, lecturas);
+        return Lecturas.Valorizadas(await _queries.WithCostAsync(lecturas));
+    }
 }
 
 /// <summary>Consumption summaries aggregated by device and period.</summary>
@@ -225,8 +287,12 @@ public sealed class DeviceConsumptionController : ControllerBase
 
     /// <summary>Gets a summary by its identifier.</summary>
     [HttpGet("{consumptionId:guid}")]
-    public async Task<ConsumptionResponse> ById(Guid consumptionId) =>
-        ConsumptionResponse.From(await _queries.ConsumptionByIdAsync(consumptionId));
+    public async Task<ConsumptionResponse> ById(Guid consumptionId)
+    {
+        var resumen = await _queries.ConsumptionByIdAsync(consumptionId);
+        AccessGuards.MustOwn(User.CallerId(), resumen.UserId);
+        return ConsumptionResponse.From(resumen);
+    }
 }
 
 /// <summary>Alerts raised by the monitoring module itself.</summary>
@@ -263,18 +329,36 @@ public sealed class ConsumptionAlertController : ControllerBase
 
     /// <summary>Gets an alert by its identifier.</summary>
     [HttpGet("{alertId:guid}")]
-    public async Task<AlertResponse> ById(Guid alertId) =>
-        AlertResponse.From(await _queries.AlertByIdAsync(alertId));
+    public async Task<AlertResponse> ById(Guid alertId)
+    {
+        var aviso = await _queries.AlertByIdAsync(alertId);
+        AccessGuards.MustOwn(User.CallerId(), aviso.UserId);
+        return AlertResponse.From(aviso);
+    }
 
     /// <summary>Marks an alert as read.</summary>
     [HttpPatch("{alertId:guid}/read")]
-    public async Task<AlertResponse> MarkRead(Guid alertId) =>
-        AlertResponse.From(await _commands.MarkAlertReadAsync(alertId));
+    public async Task<AlertResponse> MarkRead(Guid alertId)
+    {
+        await DebeSerSuyoAsync(alertId);
+        return AlertResponse.From(await _commands.MarkAlertReadAsync(alertId));
+    }
 
     /// <summary>Marks an alert as resolved.</summary>
     [HttpPatch("{alertId:guid}/resolve")]
-    public async Task<AlertResponse> Resolve(Guid alertId) =>
-        AlertResponse.From(await _commands.ResolveAlertAsync(alertId));
+    public async Task<AlertResponse> Resolve(Guid alertId)
+    {
+        await DebeSerSuyoAsync(alertId);
+        return AlertResponse.From(await _commands.ResolveAlertAsync(alertId));
+    }
+
+    /// <summary>
+    /// Estos avisos los levanta el propio modulo para una persona, no para un
+    /// local: no hay membresia a la que recurrir.
+    /// </summary>
+    private async Task DebeSerSuyoAsync(Guid alertId) =>
+        AccessGuards.MustOwn(User.CallerId(),
+            (await _queries.AlertByIdAsync(alertId)).UserId);
 }
 
 /// <summary>User energy goals.</summary>
@@ -317,6 +401,25 @@ public sealed class UserGoalController : ControllerBase
 /// </remarks>
 internal static class Lecturas
 {
+    /// <summary>
+    /// Comprueba contra las propias lecturas de quien son.
+    /// </summary>
+    /// <remarks>
+    /// Una lectura no guarda el local, pero si al usuario. Para las rutas que
+    /// filtran por equipo o por medidor no hace falta averiguar de quien es el
+    /// aparato: basta mirar lo que se va a devolver. Si no hay nada, no hay
+    /// nada que tapar y la respuesta vacia es la correcta.
+    /// </remarks>
+    public static void DebenSerDe(ClaimsPrincipal llamante,
+        IEnumerable<EnergyReading> lecturas)
+    {
+        var usuario = llamante.CallerId();
+        foreach (var lectura in lecturas)
+        {
+            AccessGuards.MustOwn(usuario, lectura.UserId);
+        }
+    }
+
     public static List<ReadingResponse> Valorizadas(
         IEnumerable<EnergyQueryService.ReadingWithCost> lecturas) =>
         lecturas.Select(l => ReadingResponse.From(l.Reading, l.EstimatedCost)).ToList();

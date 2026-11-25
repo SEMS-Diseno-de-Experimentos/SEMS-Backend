@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Organizations.Application;
 using Sems.Api.Shared.Http;
+using Sems.Api.Shared.Security;
 using Sems.Api.Shared.Errors;
 using static Sems.Api.Modules.Organizations.Interfaces.OrganizationResources;
 
@@ -15,14 +16,34 @@ public sealed class OrganizationController : ControllerBase
     private readonly OrganizationCommandService _commands;
     private readonly OrganizationQueryService _queries;
     private readonly Sems.Api.Modules.Iam.Interfaces.Acl.IIamAcl _iam;
+    private readonly IAccessPolicy _access;
 
     public OrganizationController(OrganizationCommandService commands,
-        OrganizationQueryService queries, Sems.Api.Modules.Iam.Interfaces.Acl.IIamAcl iam)
+        OrganizationQueryService queries, Sems.Api.Modules.Iam.Interfaces.Acl.IIamAcl iam,
+        IAccessPolicy access)
     {
         _commands = commands;
         _queries = queries;
         _iam = iam;
+        _access = access;
     }
+
+    /// <summary>
+    /// Pertenecer a la organizacion basta para leerla; cambiarla, no.
+    /// </summary>
+    /// <remarks>
+    /// El modelo de membresias ya dice que el ORG_ADMIN manda en toda la cadena
+    /// y que el supervisor se limita a su local. Aqui solo se aplica esa regla:
+    /// dar de alta un local o repartir accesos es de la cadena, y leer quien
+    /// trabaja en ella es de cualquiera que trabaje en ella.
+    /// </remarks>
+    private Task DebePertenecerAsync(string organizationId) =>
+        _access.MustReachOrganizationAsync(User.CallerId(),
+            ParseId(organizationId, "organization_id"));
+
+    private Task DebeAdministrarAsync(string organizationId) =>
+        _access.MustAdministerOrganizationAsync(User.CallerId(),
+            ParseId(organizationId, "organization_id"));
 
     /// <summary>Registers an organization and makes its creator the administrator.</summary>
     [HttpPost]
@@ -47,15 +68,22 @@ public sealed class OrganizationController : ControllerBase
     }
 
     [HttpGet("{organizationId}")]
-    public async Task<OrganizationResource> Get(string organizationId) =>
-        OrganizationResource.From(await _queries.GetAsync(ParseId(organizationId, "organization_id")));
+    public async Task<OrganizationResource> Get(string organizationId)
+    {
+        await DebePertenecerAsync(organizationId);
+        return OrganizationResource.From(
+            await _queries.GetAsync(ParseId(organizationId, "organization_id")));
+    }
 
     [HttpPut("{organizationId}")]
     public async Task<OrganizationResource> Update(string organizationId,
-        [FromBody] UpdateOrganizationRequest request) =>
-        OrganizationResource.From(await _commands.UpdateAsync(
+        [FromBody] UpdateOrganizationRequest request)
+    {
+        await DebeAdministrarAsync(organizationId);
+        return OrganizationResource.From(await _commands.UpdateAsync(
             ParseId(organizationId, "organization_id"), request.LegalName, request.TradeName,
             request.BusinessType));
+    }
 
     // ----------------------------------------------------------------- locales
 
@@ -64,6 +92,7 @@ public sealed class OrganizationController : ControllerBase
     public async Task<ActionResult<SiteResource>> CreateSite(string organizationId,
         [FromBody] CreateSiteRequest request)
     {
+        await DebeAdministrarAsync(organizationId);
         var local = await _commands.RegisterSiteAsync(ParseId(organizationId, "organization_id"),
             request.SiteCode, request.Name, request.Address, request.District, request.FloorAreaM2,
             request.ContractedPowerKw, request.TariffCategory,
@@ -75,6 +104,7 @@ public sealed class OrganizationController : ControllerBase
     [HttpGet("{organizationId}/sites")]
     public async Task<List<SiteResource>> ListSites(string organizationId)
     {
+        await DebePertenecerAsync(organizationId);
         var locales = await _queries.ListSitesAsync(ParseId(organizationId, "organization_id"));
         return locales.Select(SiteResource.From).ToList();
     }
@@ -84,6 +114,9 @@ public sealed class OrganizationController : ControllerBase
     public async Task<List<MembershipResource>> ListMembers(string organizationId,
         CancellationToken ct)
     {
+        // Esta ruta publica los correos de los companeros, asi que la ve quien
+        // trabaja en la organizacion y nadie mas.
+        await DebePertenecerAsync(organizationId);
         var vinculos = await _queries.ListMembershipsAsync(ParseId(organizationId, "organization_id"));
         var correos = await _iam.EmailsOfAsync(vinculos.Select(v => v.UserId).Distinct().ToList(), ct);
         return vinculos
@@ -97,6 +130,7 @@ public sealed class OrganizationController : ControllerBase
     public async Task<ActionResult<MembershipResource>> GrantMembership(string organizationId,
         [FromBody] GrantMembershipRequest request, CancellationToken ct)
     {
+        await DebeAdministrarAsync(organizationId);
         var usuario = await ResolverUsuarioAsync(request, ct);
         var vinculo = await _commands.GrantMembershipAsync(
             ParseId(organizationId, "organization_id"), usuario,
@@ -132,7 +166,19 @@ public sealed class OrganizationController : ControllerBase
     [HttpDelete("{organizationId}/members/{membershipId}")]
     public async Task<IActionResult> RevokeMembership(string organizationId, string membershipId)
     {
-        await _commands.RevokeMembershipAsync(ParseId(membershipId, "membership_id"));
+        await DebeAdministrarAsync(organizationId);
+
+        // Que el vinculo sea de la organizacion de la ruta no es un detalle: sin
+        // esta comprobacion, el administrador de una cadena podria revocar el
+        // acceso de alguien de otra pasando su propio identificador y el
+        // vinculo ajeno.
+        var vinculo = await _queries.GetMembershipAsync(ParseId(membershipId, "membership_id"));
+        if (vinculo.OrganizationId != ParseId(organizationId, "organization_id"))
+        {
+            throw AppException.Forbidden("the membership does not belong to that organization");
+        }
+
+        await _commands.RevokeMembershipAsync(vinculo.MembershipId);
         return NoContent();
     }
 
@@ -158,28 +204,63 @@ public sealed class SiteController : ControllerBase
     private readonly OrganizationCommandService _commands;
     private readonly OrganizationQueryService _queries;
 
-    public SiteController(OrganizationCommandService commands, OrganizationQueryService queries)
+    private readonly IAccessPolicy _access;
+
+    public SiteController(OrganizationCommandService commands, OrganizationQueryService queries,
+        IAccessPolicy access)
     {
         _commands = commands;
         _queries = queries;
+        _access = access;
+    }
+
+    /// <summary>
+    /// Alcanzar el local basta para leerlo y para organizar sus zonas.
+    /// </summary>
+    /// <remarks>
+    /// El alcance se comprueba antes de cargar nada: un local que no existe
+    /// responde lo mismo que uno ajeno, y asi nadie averigua que
+    /// identificadores existen pidiendolos uno a uno.
+    /// </remarks>
+    private Task DebeAlcanzarAsync(Guid siteId) =>
+        _access.MustReachSiteAsync(User.CallerId(), siteId);
+
+    /// <summary>
+    /// Cambiar la potencia contratada o la tarifa de un local es del contrato
+    /// de la cadena, no del dia a dia de la tienda: eso lo decide el
+    /// administrador de la organizacion.
+    /// </summary>
+    private async Task DebeAdministrarElLocalAsync(Guid siteId)
+    {
+        await DebeAlcanzarAsync(siteId);
+        var local = await _queries.GetSiteAsync(siteId);
+        await _access.MustAdministerOrganizationAsync(User.CallerId(), local.OrganizationId);
     }
 
     [HttpGet("{siteId}")]
-    public async Task<SiteResource> Get(string siteId) =>
-        SiteResource.From(await _queries.GetSiteAsync(
-            OrganizationController.ParseId(siteId, "site_id")));
+    public async Task<SiteResource> Get(string siteId)
+    {
+        var id = OrganizationController.ParseId(siteId, "site_id");
+        await DebeAlcanzarAsync(id);
+        return SiteResource.From(await _queries.GetSiteAsync(id));
+    }
 
     [HttpPut("{siteId}")]
-    public async Task<SiteResource> Update(string siteId, [FromBody] UpdateSiteRequest request) =>
-        SiteResource.From(await _commands.UpdateSiteAsync(
-            OrganizationController.ParseId(siteId, "site_id"), request.Name, request.Address,
+    public async Task<SiteResource> Update(string siteId, [FromBody] UpdateSiteRequest request)
+    {
+        var id = OrganizationController.ParseId(siteId, "site_id");
+        await DebeAdministrarElLocalAsync(id);
+        return SiteResource.From(await _commands.UpdateSiteAsync(id, request.Name, request.Address,
             request.District, request.FloorAreaM2, request.ContractedPowerKw,
             request.TariffCategory, request.ExcludesSundaysFromPeak ?? false));
+    }
 
     [HttpDelete("{siteId}")]
     public async Task<IActionResult> Archive(string siteId)
     {
-        await _commands.ArchiveSiteAsync(OrganizationController.ParseId(siteId, "site_id"));
+        var id = OrganizationController.ParseId(siteId, "site_id");
+        await DebeAdministrarElLocalAsync(id);
+        await _commands.ArchiveSiteAsync(id);
         return NoContent();
     }
 
@@ -187,7 +268,9 @@ public sealed class SiteController : ControllerBase
     [HttpGet("{siteId}/zones")]
     public async Task<List<ZoneResource>> ListZones(string siteId)
     {
-        var zonas = await _queries.ListZonesAsync(OrganizationController.ParseId(siteId, "site_id"));
+        var id = OrganizationController.ParseId(siteId, "site_id");
+        await DebeAlcanzarAsync(id);
+        var zonas = await _queries.ListZonesAsync(id);
         return zonas.Select(ZoneResource.From).ToList();
     }
 
@@ -195,22 +278,31 @@ public sealed class SiteController : ControllerBase
     public async Task<ActionResult<ZoneResource>> CreateZone(string siteId,
         [FromBody] CreateZoneRequest request)
     {
-        var zona = await _commands.RegisterZoneAsync(
-            OrganizationController.ParseId(siteId, "site_id"), request.Name, request.ZoneType,
+        var id = OrganizationController.ParseId(siteId, "site_id");
+
+        // Repartir el local en zonas es trabajo de la tienda, no del contrato:
+        // el supervisor de ese local puede hacerlo.
+        await DebeAlcanzarAsync(id);
+        var zona = await _commands.RegisterZoneAsync(id, request.Name, request.ZoneType,
             request.OperatesOffHours);
         return StatusCode(StatusCodes.Status201Created, ZoneResource.From(zona));
     }
 
     [HttpPut("/api/v1/zones/{zoneId}")]
-    public async Task<ZoneResource> UpdateZone(string zoneId, [FromBody] UpdateZoneRequest request) =>
-        ZoneResource.From(await _commands.UpdateZoneAsync(
-            OrganizationController.ParseId(zoneId, "zone_id"), request.Name, request.ZoneType,
+    public async Task<ZoneResource> UpdateZone(string zoneId, [FromBody] UpdateZoneRequest request)
+    {
+        var id = OrganizationController.ParseId(zoneId, "zone_id");
+        await _access.MustReachZoneAsync(User.CallerId(), id);
+        return ZoneResource.From(await _commands.UpdateZoneAsync(id, request.Name, request.ZoneType,
             request.OperatesOffHours));
+    }
 
     [HttpDelete("/api/v1/zones/{zoneId}")]
     public async Task<IActionResult> ArchiveZone(string zoneId)
     {
-        await _commands.ArchiveZoneAsync(OrganizationController.ParseId(zoneId, "zone_id"));
+        var id = OrganizationController.ParseId(zoneId, "zone_id");
+        await _access.MustReachZoneAsync(User.CallerId(), id);
+        await _commands.ArchiveZoneAsync(id);
         return NoContent();
     }
 }

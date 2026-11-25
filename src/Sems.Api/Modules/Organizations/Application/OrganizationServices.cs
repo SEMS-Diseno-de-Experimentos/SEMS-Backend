@@ -297,6 +297,11 @@ public sealed class OrganizationQueryService
         CancellationToken ct = default) =>
         _memberships.FindByOrganizationIdAsync(organizationId, ct);
 
+    public async Task<Membership> GetMembershipAsync(Guid membershipId,
+        CancellationToken ct = default) =>
+        await _memberships.FindByIdAsync(membershipId, ct)
+        ?? throw AppException.NotFound("membership not found");
+
     /// <summary>Organizaciones a las que pertenece una persona.</summary>
     public async Task<List<(Organization Organizacion, Membership Vinculo)>> ListMineAsync(
         Guid userId, CancellationToken ct = default)

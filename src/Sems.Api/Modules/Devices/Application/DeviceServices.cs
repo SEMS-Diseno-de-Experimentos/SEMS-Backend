@@ -226,9 +226,19 @@ public sealed class DeviceQueryService
     public Task<List<DeviceBinding>> BindingsByUserAsync(Guid userId, CancellationToken ct = default) =>
         _bindings.FindByUserIdAsync(userId, ct);
 
+    public async Task<DeviceBinding> BindingByIdAsync(Guid bindingId,
+        CancellationToken ct = default) =>
+        await _bindings.FindByIdAsync(bindingId, ct)
+        ?? throw AppException.NotFound("binding not found");
+
     public Task<List<DeviceConfiguration>> ConfigurationsByDeviceAsync(Guid deviceId,
         CancellationToken ct = default) =>
         _configurations.FindByDeviceIdAsync(deviceId, ct);
+
+    public async Task<DeviceConfiguration> ConfigurationByIdAsync(Guid configurationId,
+        CancellationToken ct = default) =>
+        await _configurations.FindByIdAsync(configurationId, ct)
+        ?? throw AppException.NotFound("configuration not found");
 
     public Task<List<DeviceEvent>> EventsByDeviceAsync(Guid deviceId, CancellationToken ct = default) =>
         _events.FindByDeviceIdAsync(deviceId, ct);

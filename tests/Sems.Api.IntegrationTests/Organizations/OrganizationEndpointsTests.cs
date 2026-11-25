@@ -77,14 +77,23 @@ public class OrganizationEndpointsTests : IClassFixture<SemsApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>
+    /// Una organizacion que no existe responde igual que una ajena.
+    /// </summary>
+    /// <remarks>
+    /// Antes devolvia 404 y ahora 403, porque la pertenencia se comprueba antes
+    /// de cargar nada. El cambio es a proposito: con 404 para la inexistente y
+    /// 403 para la ajena, cualquiera averiguaria que organizaciones existen
+    /// pidiendolas una a una.
+    /// </remarks>
     [Fact]
-    public async Task Get_UnknownOrganization_Returns404()
+    public async Task Get_UnknownOrganization_IsIndistinguishableFromSomeoneElsesOrganization()
     {
         var user = await _factory.CreateUserAsync();
 
         var response = await user.Client.GetAsync($"/api/v1/organizations/{Guid.NewGuid()}");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

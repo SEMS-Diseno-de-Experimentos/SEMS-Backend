@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Sems.Api.Modules.Energy.Application;
+using Sems.Api.Shared.Http;
+using Sems.Api.Shared.Security;
 using Swashbuckle.AspNetCore.Annotations;
 
 namespace Sems.Api.Modules.Energy.Interfaces;
@@ -20,26 +22,46 @@ namespace Sems.Api.Modules.Energy.Interfaces;
 public sealed class ConsumptionBreakdownController : ControllerBase
 {
     private readonly ConsumptionBreakdownService _breakdown;
+    private readonly IAccessPolicy _access;
 
-    public ConsumptionBreakdownController(ConsumptionBreakdownService breakdown) =>
+    public ConsumptionBreakdownController(ConsumptionBreakdownService breakdown,
+        IAccessPolicy access)
+    {
         _breakdown = breakdown;
+        _access = access;
+    }
 
     /// <summary>Usage of a site split across its zones.</summary>
+    /// <remarks>
+    /// Estas tres rutas cuelgan del local y de la organizacion, asi que aqui la
+    /// pregunta no es de quien es el dato sino hasta donde llega quien pregunta.
+    /// La comparacion entre locales es ademas la que mas revela: ensena el
+    /// consumo de toda la cadena de una vez.
+    /// </remarks>
     [HttpGet("sites/{siteId:guid}/zone-consumption")]
     public async Task<ZoneBreakdownResponse> ByZone(Guid siteId,
-        [FromQuery] int days = ConsumptionBreakdownService.DiasPorDefecto) =>
-        ZoneBreakdownResponse.From(await _breakdown.ByZoneAsync(siteId, days));
+        [FromQuery] int days = ConsumptionBreakdownService.DiasPorDefecto)
+    {
+        await _access.MustReachSiteAsync(User.CallerId(), siteId);
+        return ZoneBreakdownResponse.From(await _breakdown.ByZoneAsync(siteId, days));
+    }
 
     /// <summary>Usage of each site of an organization, for comparison.</summary>
     [HttpGet("organizations/{organizationId:guid}/site-consumption")]
     public async Task<SiteComparisonResponse> BySite(Guid organizationId,
-        [FromQuery] int days = ConsumptionBreakdownService.DiasPorDefecto) =>
-        SiteComparisonResponse.From(await _breakdown.BySiteAsync(organizationId, days));
+        [FromQuery] int days = ConsumptionBreakdownService.DiasPorDefecto)
+    {
+        await _access.MustReachOrganizationAsync(User.CallerId(), organizationId);
+        return SiteComparisonResponse.From(await _breakdown.BySiteAsync(organizationId, days));
+    }
 
     /// <summary>Power the site is drawing right now.</summary>
     [HttpGet("sites/{siteId:guid}/consumption/current")]
-    public async Task<CurrentConsumptionResponse> Current(Guid siteId) =>
-        CurrentConsumptionResponse.From(await _breakdown.CurrentAsync(siteId));
+    public async Task<CurrentConsumptionResponse> Current(Guid siteId)
+    {
+        await _access.MustReachSiteAsync(User.CallerId(), siteId);
+        return CurrentConsumptionResponse.From(await _breakdown.CurrentAsync(siteId));
+    }
 
     // Las respuestas viven aqui porque no las comparte nadie mas; el modulo de
     // energia responde en snake_case, como el resto de sus recursos.
